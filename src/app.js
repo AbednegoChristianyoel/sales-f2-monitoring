@@ -146,17 +146,19 @@
 
   function buildRows(dataRows, view, period, targets) {
     const grouped = new Map();
+    const includedRows = [];
     dataRows.forEach((row) => {
       const rawName = String(row[view.field] || "").trim();
       const name = view.transform ? view.transform(rawName) : rawName || "Unassigned";
       if (!name) return;
       if (!grouped.has(name)) grouped.set(name, []);
       grouped.get(name).push(row);
+      includedRows.push(row);
     });
 
     const { year, month } = periodParts(period);
-    const totalTy = sumMonths(dataRows, year, 1, month);
-    const totalLy = sumMonths(dataRows, year - 1, 1, month);
+    const totalTy = sumMonths(includedRows, year, 1, month);
+    const totalLy = sumMonths(includedRows, year - 1, 1, month);
 
     const rows = Array.from(grouped.entries()).map(([name, sourceRows]) => {
       const targetKey = `${view.id}:${period}:${name}`;
@@ -210,13 +212,13 @@
       gapGrowthZero: totalTy - totalLy,
       avgLy: month ? totalLy / month : 0,
       avgTy: month ? totalTy / month : 0,
-      avgB01: avgWindow(dataRows, period, 0, 1),
-      avgB25: avgWindow(dataRows, period, 2, 5),
-      avgB02: avgWindow(dataRows, period, 0, 2),
-      avgB35: avgWindow(dataRows, period, 3, 5),
+      avgB01: avgWindow(includedRows, period, 0, 1),
+      avgB25: avgWindow(includedRows, period, 2, 5),
+      avgB02: avgWindow(includedRows, period, 0, 2),
+      avgB35: avgWindow(includedRows, period, 3, 5),
       growthYtd: pct(totalTy - totalLy, totalLy),
-      growth24: pct(avgWindow(dataRows, period, 0, 1) - avgWindow(dataRows, period, 2, 5), avgWindow(dataRows, period, 2, 5)),
-      growth33: pct(avgWindow(dataRows, period, 0, 2) - avgWindow(dataRows, period, 3, 5), avgWindow(dataRows, period, 3, 5)),
+      growth24: pct(avgWindow(includedRows, period, 0, 1) - avgWindow(includedRows, period, 2, 5), avgWindow(includedRows, period, 2, 5)),
+      growth33: pct(avgWindow(includedRows, period, 0, 2) - avgWindow(includedRows, period, 3, 5), avgWindow(includedRows, period, 3, 5)),
       contLy: 1,
       contTy: 1,
       total: true,
