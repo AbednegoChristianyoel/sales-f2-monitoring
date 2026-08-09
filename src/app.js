@@ -909,7 +909,7 @@
       "tr",
       { className: row.total ? "total-row" : "" },
       row.total
-        ? React.createElement("td", { colSpan: leftColumnSpan, className: `sticky-col total-label-cell ${showItemCodeColumn ? "total-label-wide" : ""}`, title: "TOTAL" }, "TOTAL")
+        ? React.createElement("td", { colSpan: leftColumnSpan, className: `sticky-col total-label-cell total-label-${leftColumnSpan}`, title: "TOTAL" }, "TOTAL")
         : [
             showMarketingColumn && React.createElement("td", { key: "divisiMarketing", className: "sticky-col divisi-cell", title: row.divisiMarketing }, row.divisiMarketing),
             showItemCodeColumn && React.createElement("td", { key: "itemCode", className: "sticky-col item-code-cell sticky-col-2", title: row.itemCode }, row.itemCode),
