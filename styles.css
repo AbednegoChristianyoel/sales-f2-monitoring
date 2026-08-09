@@ -263,30 +263,100 @@ select {
   font-weight: 700;
 }
 
+button.filter-select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.filter-select span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filter-select b {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1;
+}
+
+.filter-select.selected {
+  background: #eef6ff;
+}
+
 .wide-filter {
   width: min(360px, 100%);
 }
 
 .filter-search .filter-select {
   width: 100%;
-  padding-right: 30px;
 }
 
-.filter-search button {
+.filter-menu {
   position: absolute;
-  top: 50%;
-  right: 7px;
-  width: 20px;
-  height: 20px;
-  transform: translateY(-50%);
-  border: 0;
-  border-radius: 999px;
-  background: #dfe7f2;
-  color: #172033;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  width: min(360px, calc(100vw - 32px));
+  border: 1px solid #111;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.18);
+  padding: 8px;
+}
+
+.wide-filter .filter-menu {
+  width: 100%;
+}
+
+.filter-search-input {
+  width: 100%;
+  height: 36px;
+  border: 1px solid #bac7d8;
+  border-radius: 6px;
+  padding: 0 10px;
+  color: var(--ink);
   font-size: 12px;
-  font-weight: 900;
-  line-height: 20px;
+}
+
+.filter-options {
+  display: grid;
+  gap: 4px;
+  max-height: 240px;
+  margin-top: 8px;
+  overflow-y: auto;
+}
+
+.filter-options button {
+  width: 100%;
+  min-height: 36px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
   cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.filter-options button:hover,
+.filter-options button:focus,
+.filter-options button.active {
+  background: #e8f1ff;
+}
+
+.filter-empty {
+  color: var(--muted);
+  font-size: 12px;
+  padding: 10px;
 }
 
 .pager {
@@ -652,6 +722,10 @@ thead tr:first-child .group {
   }
 
   .filter-search {
+    width: 100%;
+  }
+
+  .filter-menu {
     width: 100%;
   }
 

@@ -867,29 +867,83 @@
   }
 
   function FilterSearch({ id, label, value, options, onChange, wide }) {
-    const inputValue = value === "all" ? "" : value;
+    const [open, setOpen] = useState(false);
+    const [query, setQuery] = useState("");
+    const selectedLabel = value === "all" ? label : value;
+    const normalizedQuery = query.trim().toLowerCase();
+    const filteredOptions = normalizedQuery ? options.filter((item) => item.toLowerCase().includes(normalizedQuery)) : options;
+
+    function selectValue(nextValue) {
+      onChange(nextValue);
+      setOpen(false);
+      setQuery("");
+    }
+
     return React.createElement(
       "div",
-      { className: `filter-search ${wide ? "wide-filter" : ""}` },
-      React.createElement("input", {
-        className: "filter-select",
-        list: id,
-        value: inputValue,
-        onChange: (event) => onChange(event.target.value || "all"),
-        placeholder: label,
-        "aria-label": label,
-      }),
-      inputValue &&
-        React.createElement(
-          "button",
-          { type: "button", onClick: () => onChange("all"), title: `Clear ${label}` },
-          "x"
-        ),
+      {
+        className: `filter-search ${wide ? "wide-filter" : ""}`,
+        onBlur: (event) => !event.currentTarget.contains(event.relatedTarget) && window.setTimeout(() => setOpen(false), 100),
+      },
       React.createElement(
-        "datalist",
-        { id },
-        options.map((item) => React.createElement("option", { key: item, value: item }))
-      )
+        "button",
+        {
+          type: "button",
+          className: `filter-select ${value !== "all" ? "selected" : ""}`,
+          onClick: () => setOpen((current) => !current),
+          "aria-haspopup": "listbox",
+          "aria-expanded": open,
+          "aria-controls": id,
+        },
+        React.createElement("span", null, selectedLabel),
+        React.createElement("b", null, "v")
+      ),
+      open &&
+        React.createElement(
+          "div",
+          { className: "filter-menu" },
+          React.createElement("input", {
+            className: "filter-search-input",
+            value: query,
+            onChange: (event) => setQuery(event.target.value),
+            placeholder: `Search ${label.replace(/^All\s+/i, "")}...`,
+            "aria-label": `Search ${label}`,
+            autoFocus: true,
+          }),
+          React.createElement(
+            "div",
+            { id, className: "filter-options", role: "listbox" },
+            React.createElement(
+              "button",
+              {
+                type: "button",
+                className: value === "all" ? "active" : "",
+                onMouseDown: (event) => event.preventDefault(),
+                onClick: () => selectValue("all"),
+                role: "option",
+                "aria-selected": value === "all",
+              },
+              label
+            ),
+            filteredOptions.length
+              ? filteredOptions.map((item) =>
+                  React.createElement(
+                    "button",
+                    {
+                      key: item,
+                      type: "button",
+                      className: item === value ? "active" : "",
+                      onMouseDown: (event) => event.preventDefault(),
+                      onClick: () => selectValue(item),
+                      role: "option",
+                      "aria-selected": item === value,
+                    },
+                    item
+                  )
+                )
+              : React.createElement("span", { className: "filter-empty" }, "No results")
+          )
+        )
     );
   }
 
