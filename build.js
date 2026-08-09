@@ -25,52 +25,39 @@ copyFile(path.join(root, "styles.css"), path.join(dist, "styles.css"));
 copyFile(path.join(root, ".openai", "hosting.json"), path.join(dist, ".openai", "hosting.json"));
 copyDir(path.join(root, "src"), path.join(dist, "src"));
 fs.mkdirSync(path.join(dist, "server"), { recursive: true });
+const assets = {
+  "/": {
+    body: fs.readFileSync(path.join(root, "index.html"), "utf8"),
+    type: "text/html; charset=utf-8",
+  },
+  "/index.html": {
+    body: fs.readFileSync(path.join(root, "index.html"), "utf8"),
+    type: "text/html; charset=utf-8",
+  },
+  "/styles.css": {
+    body: fs.readFileSync(path.join(root, "styles.css"), "utf8"),
+    type: "text/css; charset=utf-8",
+  },
+  "/src/app.js": {
+    body: fs.readFileSync(path.join(root, "src", "app.js"), "utf8"),
+    type: "application/javascript; charset=utf-8",
+  },
+};
 fs.writeFileSync(
   path.join(dist, "server", "index.js"),
-  `import http from "node:http";
-import fs from "node:fs";
-import path from "node:path";
+  `const assets = ${JSON.stringify(assets)};
 
-const publicDir = [
-  path.resolve(process.cwd(), "dist"),
-  path.resolve(process.cwd()),
-  path.resolve(process.cwd(), "..")
-].find((candidate) => fs.existsSync(path.join(candidate, "index.html"))) || process.cwd();
-const mime = {
-  ".html": "text/html; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".js": "application/javascript; charset=utf-8",
-  ".json": "application/json; charset=utf-8",
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".svg": "image/svg+xml"
+export default {
+  async fetch(request) {
+    const url = new URL(request.url);
+    const asset = assets[url.pathname] || assets["/index.html"];
+    return new Response(asset.body, {
+      headers: {
+        "Content-Type": asset.type,
+        "Cache-Control": url.pathname === "/" || url.pathname === "/index.html" ? "no-store" : "public, max-age=3600"
+      }
+    });
+  }
 };
-
-function send(res, status, body, type = "text/plain; charset=utf-8") {
-  res.writeHead(status, { "Content-Type": type });
-  res.end(body);
-}
-
-function resolvePath(url) {
-  const requestPath = decodeURIComponent(new URL(url, "http://localhost").pathname);
-  const filePath = path.normalize(path.join(publicDir, requestPath === "/" ? "index.html" : requestPath));
-  if (!filePath.startsWith(publicDir)) return null;
-  return fs.existsSync(filePath) && fs.statSync(filePath).isFile() ? filePath : path.join(publicDir, "index.html");
-}
-
-const server = http.createServer((req, res) => {
-  const filePath = resolvePath(req.url);
-  if (!filePath) return send(res, 403, "Forbidden");
-  fs.readFile(filePath, (error, data) => {
-    if (error) return send(res, 500, "Server error");
-    send(res, 200, data, mime[path.extname(filePath)] || "application/octet-stream");
-  });
-});
-
-const port = process.env.PORT || 3000;
-server.listen(port, "0.0.0.0", () => {
-  console.log("Sales F2 Monitoring running on " + port);
-});
 `
 );
