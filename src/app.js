@@ -256,6 +256,40 @@
     });
   }
 
+  function buildTotalFromRows(rows, period) {
+    const { year, month } = periodParts(period);
+    const totalTarget = rows.reduce((sum, row) => sum + numeric(row.target), 0);
+    const ytdTy = rows.reduce((sum, row) => sum + numeric(row.ytdTy), 0);
+    const ytdLy = rows.reduce((sum, row) => sum + numeric(row.ytdLy), 0);
+    const avgB01 = rows.reduce((sum, row) => sum + numeric(row.avgB01), 0);
+    const avgB25 = rows.reduce((sum, row) => sum + numeric(row.avgB25), 0);
+    const avgB02 = rows.reduce((sum, row) => sum + numeric(row.avgB02), 0);
+    const avgB35 = rows.reduce((sum, row) => sum + numeric(row.avgB35), 0);
+    return {
+      name: "TOTAL",
+      target: totalTarget,
+      ytdTy,
+      ach: pct(ytdTy, totalTarget),
+      gapTarget: ytdTy - totalTarget,
+      ytdLy,
+      gapGrowthZero: ytdTy - ytdLy,
+      avgLy: month ? ytdLy / month : 0,
+      avgTy: month ? ytdTy / month : 0,
+      avgB01,
+      avgB25,
+      avgB02,
+      avgB35,
+      growthYtd: pct(ytdTy - ytdLy, ytdLy),
+      growth24: pct(avgB01 - avgB25, avgB25),
+      growth33: pct(avgB02 - avgB35, avgB35),
+      contLy: 1,
+      contTy: 1,
+      history2025: MONTH_NAMES.map((_, index) => rows.reduce((sum, row) => sum + numeric(row.history2025[index]), 0)),
+      actual2026: MONTH_NAMES.map((_, index) => rows.reduce((sum, row) => sum + numeric(row.actual2026[index]), 0)),
+      total: true,
+    };
+  }
+
   function getTableColumns(period, showHistory) {
     const month = Number(period.slice(4, 6));
     const year = Number(period.slice(0, 4));
@@ -296,7 +330,10 @@
     const [period, setPeriod] = useState("202606");
     const [showHistory, setShowHistory] = useState(false);
     const [sort, setSort] = useState({ key: null, direction: "desc" });
+    const [search, setSearch] = useState("");
+    const [page, setPage] = useState(1);
     const [alertPeriod, setAlertPeriod] = useState(null);
+    const pageSize = 11;
 
     useEffect(() => localStorage.setItem(TARGET_KEY, JSON.stringify(targets)), [targets]);
 
@@ -310,16 +347,29 @@
       setTargets((current) => ({ ...current, [key]: numeric(value) }));
     }
 
-    const summary = total || {};
+    const normalizedSearch = search.trim().toLowerCase();
+    const filteredRows = useMemo(
+      () => (normalizedSearch ? rows.filter((row) => row.name.toLowerCase().includes(normalizedSearch)) : rows),
+      [rows, normalizedSearch]
+    );
+    const filteredTotal = useMemo(() => buildTotalFromRows(filteredRows, period), [filteredRows, period]);
+    const summary = filteredTotal || {};
     const selectedLabel = period ? monthLabel(period) : "";
     const currentMonthActual = total ? total.actual2026[Number(period.slice(4, 6)) - 1] : 0;
-    const sortedRows = useMemo(() => sortRows(rows, sort), [rows, sort]);
-    const displayRows = total ? [...sortedRows, total] : sortedRows;
+    const sortedRows = useMemo(() => sortRows(filteredRows, sort), [filteredRows, sort]);
+    const totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize));
+    const currentPage = Math.min(page, totalPages);
+    const pagedRows = sortedRows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+    const displayRows = [...pagedRows, filteredTotal];
     const tableColumns = getTableColumns(period, showHistory);
 
     useEffect(() => {
       if (total && numeric(currentMonthActual) === 0) setAlertPeriod(period);
     }, [period, total, currentMonthActual]);
+
+    useEffect(() => {
+      setPage(1);
+    }, [search, activeViewId, period, showHistory]);
 
     function onPeriodChange(value) {
       setPeriod(value);
@@ -330,6 +380,12 @@
         key,
         direction: current.key === key && current.direction === "desc" ? "asc" : "desc",
       }));
+    }
+
+    function onPageInput(value) {
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) return;
+      setPage(Math.min(totalPages, Math.max(1, parsed)));
     }
 
     return React.createElement(
@@ -384,6 +440,27 @@
             )
           ),
           React.createElement("span", { className: "status" }, status)
+        ),
+        React.createElement(
+          "div",
+          { className: "table-tools" },
+          React.createElement("input", {
+            className: "search-input",
+            value: search,
+            onChange: (event) => setSearch(event.target.value),
+            placeholder: "Search...",
+            "aria-label": "Search table",
+          }),
+          React.createElement(
+            "div",
+            { className: "pager" },
+            React.createElement("span", null, `${filteredRows.length.toLocaleString("id-ID")} Records`),
+            React.createElement("button", { onClick: () => setPage((value) => Math.max(1, value - 1)), disabled: currentPage <= 1 }, "<"),
+            React.createElement("span", null, "Page"),
+            React.createElement("input", { value: currentPage, onChange: (event) => onPageInput(event.target.value), "aria-label": "Page number" }),
+            React.createElement("span", null, `of ${totalPages.toLocaleString("id-ID")}`),
+            React.createElement("button", { onClick: () => setPage((value) => Math.min(totalPages, value + 1)), disabled: currentPage >= totalPages }, ">")
+          )
         ),
         React.createElement(
           "div",
