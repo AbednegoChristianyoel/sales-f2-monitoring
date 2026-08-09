@@ -320,7 +320,7 @@ thead tr:nth-child(2) th {
 .group {
   color: #fff;
   text-align: center;
-  font-size: 12px;
+  font-size: 14px;
   letter-spacing: 0;
 }
 
@@ -398,7 +398,7 @@ th.sticky-col {
 .sort-button {
   display: inline-flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 6px;
   width: 100%;
   min-height: 28px;
@@ -406,10 +406,10 @@ th.sticky-col {
   background: transparent;
   color: inherit;
   padding: 0;
-  font-size: inherit;
+  font-size: 12px;
   font-weight: 900;
   line-height: 1.2;
-  text-align: right;
+  text-align: center;
   text-transform: uppercase;
   cursor: pointer;
 }
@@ -431,6 +431,21 @@ th.sticky-col {
 th.sticky-col .sort-button,
 .group .sort-button {
   color: #fff;
+}
+
+th.sticky-col .sort-button {
+  font-size: 15px;
+}
+
+th.sticky-col .sort-button span,
+th.sticky-col .sort-button b {
+  text-align: center;
+}
+
+thead tr:first-child .group {
+  height: 52px;
+  font-size: 15px;
+  font-weight: 900;
 }
 
 .history-col {

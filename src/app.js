@@ -399,7 +399,7 @@
           null,
           React.createElement("p", { className: "eyebrow" }, "Sales performance monitoring"),
           React.createElement("h1", null, "Sales F2 Dashboard"),
-          React.createElement("p", { className: "subtitle" }, "Monitor target, actual, achievement, growth, moving averages, and contribution from the embedded Sales F2 Excel database.")
+          React.createElement("p", { className: "subtitle" }, "Monitoring Target, Actual Sales, Achievement, Growth, Moving Average, dan Kontribusi Sales Pharos 2026")
         ),
         React.createElement(
           "div",
