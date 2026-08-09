@@ -421,6 +421,121 @@
     return columns;
   }
 
+  function groupHeaders(showHistory, showTargetTrend) {
+    const groups = [
+      { label: "To Target", span: 4, color: "234F94" },
+      { label: "Growth Per YTD", span: 3, color: "2F6A54" },
+      { label: "Growth Per Average", span: 9, color: "65549D" },
+      { label: "Contribution", span: 2, color: "7F5A16" },
+    ];
+    if (showHistory) {
+      groups.push({ label: "History Sales 2025", span: 12, color: "305466" });
+      groups.push({ label: "Actual 2026", span: 12, color: "6B4B8F" });
+    }
+    if (showTargetTrend) groups.push({ label: "Target Trend 2026", span: 12, color: "0F6F8C" });
+    return groups;
+  }
+
+  function excelCellValue(row, column) {
+    const value = getCellValue(row, column.key);
+    if (column.type === "percent") return Number.isFinite(value) ? value : null;
+    return numeric(value);
+  }
+
+  async function downloadExcel({ activeView, period, rows, total, columns, showHistory, showTargetTrend }) {
+    if (!window.ExcelJS) {
+      alert("Excel export library belum selesai dimuat. Coba beberapa detik lagi.");
+      return;
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = "Sales F2 Dashboard";
+    workbook.created = new Date();
+    const sheet = workbook.addWorksheet(activeView.label.slice(0, 31), {
+      views: [{ state: "frozen", xSplit: activeView.showMarketingColumn ? 2 : 1, ySplit: 2 }],
+    });
+
+    const leftHeaders = activeView.showMarketingColumn
+      ? [
+          { key: "divisiMarketing", label: "Divisi Marketing" },
+          { key: "name", label: activeView.label },
+        ]
+      : [{ key: "name", label: activeView.label }];
+    const allColumns = [...leftHeaders, ...columns];
+    const groupStart = leftHeaders.length + 1;
+
+    leftHeaders.forEach((column, index) => {
+      const cell = sheet.getCell(1, index + 1);
+      cell.value = column.label;
+      sheet.mergeCells(1, index + 1, 2, index + 1);
+    });
+
+    let cursor = groupStart;
+    groupHeaders(showHistory, showTargetTrend).forEach((group) => {
+      sheet.mergeCells(1, cursor, 1, cursor + group.span - 1);
+      const cell = sheet.getCell(1, cursor);
+      cell.value = group.label;
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${group.color}` } };
+      cursor += group.span;
+    });
+
+    columns.forEach((column, index) => {
+      sheet.getCell(2, groupStart + index).value = column.label;
+    });
+
+    const exportRows = [...rows, total];
+    exportRows.forEach((row, rowIndex) => {
+      const excelRow = sheet.getRow(rowIndex + 3);
+      allColumns.forEach((column, colIndex) => {
+        const cell = excelRow.getCell(colIndex + 1);
+        if (column.key === "divisiMarketing") cell.value = row.divisiMarketing;
+        else if (column.key === "name") cell.value = row.total && activeView.showMarketingColumn ? "" : row.name;
+        else cell.value = excelCellValue(row, column);
+        if (column.type === "percent") cell.numFmt = "0.00%";
+        if (column.type === "number") cell.numFmt = "#,##0";
+      });
+    });
+
+    const headerFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF7F9FC" } };
+    const blackBorder = { style: "thin", color: { argb: "FF111111" } };
+    const totalRowNumber = exportRows.length + 2;
+    sheet.eachRow((row, rowNumber) => {
+      row.eachCell((cell) => {
+        cell.border = { top: blackBorder, left: blackBorder, bottom: blackBorder, right: blackBorder };
+        cell.alignment = { vertical: "middle", horizontal: rowNumber <= 2 ? "center" : "right", wrapText: rowNumber <= 2 };
+        if (rowNumber <= 2) {
+          cell.font = { bold: true, color: { argb: "FF172033" } };
+          if (!cell.fill) cell.fill = headerFill;
+        }
+        if (rowNumber === totalRowNumber) {
+          cell.font = { bold: true, color: { argb: "FF172033" } };
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF1B8" } };
+        }
+      });
+    });
+
+    for (let col = 1; col <= leftHeaders.length; col += 1) {
+      const cell = sheet.getCell(1, col);
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF172033" } };
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+    }
+
+    sheet.columns = allColumns.map((column) => ({
+      key: column.key,
+      width: column.key === "name" ? 32 : column.key === "divisiMarketing" ? 18 : column.type === "percent" ? 12 : 17,
+    }));
+
+    const fileName = `Sales_F2_${activeView.label.replace(/\s+/g, "_")}_${period}.xlsx`;
+    const buffer = await workbook.xlsx.writeBuffer();
+    const url = URL.createObjectURL(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = fileName;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
   function App() {
     const [dataRows] = useState(() => EMBEDDED_ROWS);
     const [targets, setTargets] = useState(() => safeLoad(TARGET_KEY, {}));
@@ -542,6 +657,23 @@
             { className: "toggle-control" },
             React.createElement("input", { type: "checkbox", checked: showTargetTrend, onChange: (event) => setShowTargetTrend(event.target.checked) }),
             React.createElement("span", null, "Target Trend")
+          ),
+          React.createElement(
+            "button",
+            {
+              className: "download-button",
+              onClick: () =>
+                downloadExcel({
+                  activeView,
+                  period,
+                  rows: sortedRows,
+                  total: filteredTotal,
+                  columns: tableColumns,
+                  showHistory,
+                  showTargetTrend,
+                }),
+            },
+            "Download Excel"
           )
         )
       ),

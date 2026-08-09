@@ -112,6 +112,22 @@ select {
   cursor: pointer;
 }
 
+.download-button {
+  height: 42px;
+  border: 1px solid #66b8ff;
+  border-radius: 8px;
+  background: #0f5fa8;
+  color: #fff;
+  padding: 0 16px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 10px 22px rgba(15, 95, 168, 0.25);
+}
+
+.download-button:hover {
+  background: #1370c8;
+}
+
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(160px, 1fr));
