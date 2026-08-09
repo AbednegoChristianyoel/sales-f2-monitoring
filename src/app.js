@@ -76,6 +76,11 @@
     return canonical || "Unassigned";
   }
 
+  function normalizeItemCode(value) {
+    const clean = String(value || "").trim().toUpperCase();
+    return /^\d+$/.test(clean) ? clean.padStart(6, "0") : clean;
+  }
+
   function numeric(value) {
     if (value === null || value === undefined || value === "") return 0;
     if (typeof value === "number") return Number.isFinite(value) ? value : 0;
@@ -161,14 +166,15 @@
         (item) =>
           canonicalMarketing(item["Divisi Marketing"]) === canonicalMarketing(group.divisiMarketing) &&
           String(item.Brand || "").trim().toUpperCase() === String(group.groupBrand || "").trim().toUpperCase() &&
+          normalizeItemCode(item.ITEMCODE) === normalizeItemCode(group.itemCode) &&
           String(item.PRODESC || "").trim().toUpperCase() === group.name.toUpperCase()
       );
     }
     return emptyMonths();
   }
 
-  function groupKeyFor(view, divisiMarketing, groupBrand, name) {
-    if (view.id === "prodesc") return `${divisiMarketing}|||${groupBrand}|||${name}`;
+  function groupKeyFor(view, divisiMarketing, groupBrand, name, itemCode) {
+    if (view.id === "prodesc") return `${divisiMarketing}|||${groupBrand}|||${normalizeItemCode(itemCode)}|||${name}`;
     if (view.showMarketingColumn) return `${divisiMarketing}|||${name}`;
     return name;
   }
@@ -186,9 +192,10 @@
       (TARGET_ROWS.targetProdesc || []).forEach((item) => {
         const divisiMarketing = marketingTeamName(item["Divisi Marketing"]);
         const groupBrand = String(item.Brand || "Unassigned").trim() || "Unassigned";
+        const itemCode = String(item.ITEMCODE || "").trim();
         const name = String(item.PRODESC || "Unassigned").trim() || "Unassigned";
-        const key = groupKeyFor(view, divisiMarketing, groupBrand, name);
-        if (!grouped.has(key)) grouped.set(key, { name, divisiMarketing, groupBrand, rows: [] });
+        const key = groupKeyFor(view, divisiMarketing, groupBrand, name, itemCode);
+        if (!grouped.has(key)) grouped.set(key, { name, divisiMarketing, groupBrand, itemCode, rows: [] });
       });
     }
   }
@@ -213,6 +220,12 @@
 
   function formatNumber(value) {
     return Math.round(value || 0).toLocaleString("id-ID");
+  }
+
+  function downloadTimestamp() {
+    const date = new Date();
+    const pad = (value) => String(value).padStart(2, "0");
+    return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}_${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
   }
 
   function formatPct(value) {
@@ -253,9 +266,10 @@
       const name = view.transform ? view.transform(rawName) : rawName || "Unassigned";
       const divisiMarketing = marketingTeamName(row["Divisi Marketing"]);
       const groupBrand = String(row["Group Brand"] || "Unassigned").trim() || "Unassigned";
-      const groupKey = groupKeyFor(view, divisiMarketing, groupBrand, name);
+      const itemCode = String(row["Item Kode"] || "").trim();
+      const groupKey = groupKeyFor(view, divisiMarketing, groupBrand, name, itemCode);
       if (!name) return;
-      if (!grouped.has(groupKey)) grouped.set(groupKey, { name, divisiMarketing, groupBrand, rows: [] });
+      if (!grouped.has(groupKey)) grouped.set(groupKey, { name, divisiMarketing, groupBrand, itemCode, rows: [] });
       grouped.get(groupKey).rows.push(row);
       includedRows.push(row);
     });
@@ -285,6 +299,7 @@
         name,
         divisiMarketing: group.divisiMarketing,
         groupBrand: group.groupBrand,
+        itemCode: group.itemCode || "",
         target,
         ytdTy,
         ach: pct(ytdTy, target),
@@ -319,6 +334,7 @@
     const total = {
       name: "TOTAL",
       divisiMarketing: "TOTAL",
+      itemCode: "",
       target: totalTarget,
       ytdTy: totalTy,
       ach: pct(totalTy, totalTarget),
@@ -379,6 +395,7 @@
     const avgB35 = rows.reduce((sum, row) => sum + numeric(row.avgB35), 0);
     return {
       name: "TOTAL",
+      itemCode: "",
       target: totalTarget,
       ytdTy,
       ach: pct(ytdTy, totalTarget),
@@ -469,16 +486,11 @@
     const workbook = new ExcelJS.Workbook();
     workbook.creator = "Sales F2 Dashboard";
     workbook.created = new Date();
+    const leftHeaders = getLeftHeaders(activeView);
     const sheet = workbook.addWorksheet(activeView.label.slice(0, 31), {
-      views: [{ state: "frozen", xSplit: activeView.showMarketingColumn ? 2 : 1, ySplit: 2 }],
+      views: [{ state: "frozen", xSplit: leftHeaders.length, ySplit: 2 }],
     });
 
-    const leftHeaders = activeView.showMarketingColumn
-      ? [
-          { key: "divisiMarketing", label: "Divisi Marketing" },
-          { key: "name", label: activeView.label },
-        ]
-      : [{ key: "name", label: activeView.label }];
     const allColumns = [...leftHeaders, ...columns];
     const groupStart = leftHeaders.length + 1;
 
@@ -507,6 +519,7 @@
       allColumns.forEach((column, colIndex) => {
         const cell = excelRow.getCell(colIndex + 1);
         if (column.key === "divisiMarketing") cell.value = row.divisiMarketing;
+        else if (column.key === "itemCode") cell.value = row.total ? "" : row.itemCode;
         else if (column.key === "name") cell.value = row.total && activeView.showMarketingColumn ? "" : row.name;
         else cell.value = excelCellValue(row, column);
         if (column.type === "percent") cell.numFmt = "0.00%";
@@ -541,10 +554,10 @@
 
     sheet.columns = allColumns.map((column) => ({
       key: column.key,
-      width: column.key === "name" ? 32 : column.key === "divisiMarketing" ? 18 : column.type === "percent" ? 12 : 17,
+      width: column.key === "name" ? 32 : column.key === "divisiMarketing" ? 18 : column.key === "itemCode" ? 14 : column.type === "percent" ? 12 : 17,
     }));
 
-    const fileName = `Sales_F2_${activeView.label.replace(/\s+/g, "_")}_${period}.xlsx`;
+    const fileName = `Sales_F2_${activeView.label.replace(/\s+/g, "_")}_${period}_${downloadTimestamp()}.xlsx`;
     const buffer = await workbook.xlsx.writeBuffer();
     const url = URL.createObjectURL(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
     const anchor = document.createElement("a");
@@ -552,6 +565,14 @@
     anchor.download = fileName;
     anchor.click();
     URL.revokeObjectURL(url);
+  }
+
+  function getLeftHeaders(activeView) {
+    if (!activeView.showMarketingColumn) return [{ key: "name", label: activeView.label }];
+    const headers = [{ key: "divisiMarketing", label: "Divisi Marketing" }];
+    if (activeView.id === "prodesc") headers.push({ key: "itemCode", label: "Kode Item" });
+    headers.push({ key: "name", label: activeView.label });
+    return headers;
   }
 
   function App() {
@@ -593,7 +614,7 @@
     const filteredRows = useMemo(
       () =>
         rows.filter((row) => {
-          const matchesSearch = !normalizedSearch || `${row.divisiMarketing || ""} ${row.groupBrand || ""} ${row.name}`.toLowerCase().includes(normalizedSearch);
+          const matchesSearch = !normalizedSearch || `${row.divisiMarketing || ""} ${row.groupBrand || ""} ${row.itemCode || ""} ${row.name}`.toLowerCase().includes(normalizedSearch);
           const marketingText = marketingFilter === "all" ? "" : marketingFilter.toLowerCase();
           const brandText = brandFilter === "all" ? "" : brandFilter.toLowerCase();
           const prodescText = prodescFilter === "all" ? "" : prodescFilter.toLowerCase();
@@ -615,6 +636,7 @@
     const pagedRows = sortedRows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
     const displayRows = [...pagedRows, filteredTotal];
     const tableColumns = getTableColumns(period, showHistory, showTargetTrend);
+    const showItemCodeColumn = activeView.id === "prodesc";
 
     useEffect(() => {
       if (total && numeric(currentMonthActual) === 0) setAlertPeriod(period);
@@ -787,9 +809,15 @@
                     { rowSpan: 2, className: "sticky-col divisi-col" },
                     React.createElement(SortButton, { column: { key: "divisiMarketing", label: "Divisi Marketing" }, sort, onSort })
                   ),
+                showItemCodeColumn &&
+                  React.createElement(
+                    "th",
+                    { rowSpan: 2, className: "sticky-col item-code-col sticky-col-2" },
+                    React.createElement(SortButton, { column: { key: "itemCode", label: "Kode Item" }, sort, onSort })
+                  ),
                 React.createElement(
                   "th",
-                  { rowSpan: 2, className: `sticky-col name-col ${activeView.showMarketingColumn ? "sticky-col-2" : ""}` },
+                  { rowSpan: 2, className: `sticky-col name-col ${showItemCodeColumn ? "sticky-col-3" : activeView.showMarketingColumn ? "sticky-col-2" : ""}` },
                   React.createElement(SortButton, { column: { key: "name", label: activeView.label }, sort, onSort })
                 ),
                 React.createElement("th", { colSpan: 4, className: "group target-head" }, "To Target"),
@@ -809,7 +837,7 @@
             React.createElement(
               "tbody",
               null,
-              displayRows.map((row) => React.createElement(DataRow, { key: row.total ? "total" : row.targetKey, row, columns: tableColumns, showMarketingColumn: activeView.showMarketingColumn, updateTarget }))
+              displayRows.map((row) => React.createElement(DataRow, { key: row.total ? "total" : row.targetKey, row, columns: tableColumns, showMarketingColumn: activeView.showMarketingColumn, showItemCodeColumn, updateTarget }))
             )
           )
         )
@@ -870,12 +898,13 @@
     );
   }
 
-  function DataRow({ row, columns, showMarketingColumn, updateTarget }) {
+  function DataRow({ row, columns, showMarketingColumn, showItemCodeColumn, updateTarget }) {
     return React.createElement(
       "tr",
       { className: row.total ? "total-row" : "" },
       showMarketingColumn && React.createElement("td", { className: "sticky-col divisi-cell", title: row.divisiMarketing }, row.divisiMarketing),
-      React.createElement("td", { className: `sticky-col name-cell ${showMarketingColumn ? "sticky-col-2" : ""}`, title: row.name }, row.total && showMarketingColumn ? "" : row.name),
+      showItemCodeColumn && React.createElement("td", { className: "sticky-col item-code-cell sticky-col-2", title: row.itemCode }, row.total ? "" : row.itemCode),
+      React.createElement("td", { className: `sticky-col name-cell ${showItemCodeColumn ? "sticky-col-3" : showMarketingColumn ? "sticky-col-2" : ""}`, title: row.name }, row.total && showMarketingColumn ? "" : row.name),
       columns.map((column) => {
         const value = getCellValue(row, column.key);
         const tone = column.key === "ach" ? classify((value || 0) - 1) : column.type === "percent" || column.key.includes("gap") ? classify(value) : "";
