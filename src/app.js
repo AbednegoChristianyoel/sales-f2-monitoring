@@ -16,7 +16,6 @@
         "CENTURY (Mall & Online)",
         "ALPRO",
         "PELAPAK INTERNAL",
-        "SELISIH",
       ],
     },
     { id: "brand", label: "Group Brand", field: "Group Brand" },
@@ -53,9 +52,8 @@
       "CENTURY ONLINE": "CENTURY (Mall & Online)",
       ALPRO: "ALPRO",
       "PELAPAK INTERNAL": "PELAPAK INTERNAL",
-      "(BLANK)": "SELISIH",
     };
-    return mapping[code] || value || "SELISIH";
+    return mapping[code] || value || null;
   }
 
   function numeric(value) {
@@ -151,6 +149,7 @@
     dataRows.forEach((row) => {
       const rawName = String(row[view.field] || "").trim();
       const name = view.transform ? view.transform(rawName) : rawName || "Unassigned";
+      if (!name) return;
       if (!grouped.has(name)) grouped.set(name, []);
       grouped.get(name).push(row);
     });
