@@ -357,13 +357,24 @@ thead tr:nth-child(2) th {
   text-align: left;
 }
 
+.divisi-col,
+.divisi-cell {
+  min-width: 170px;
+  max-width: 190px;
+}
+
+.sticky-col-2 {
+  left: 170px;
+}
+
 th.sticky-col {
   z-index: 8;
   background: #172033;
   color: #fff;
 }
 
-.name-cell {
+.name-cell,
+.divisi-cell {
   overflow: hidden;
   background: #fff;
   font-weight: 900;
@@ -392,6 +403,10 @@ th.sticky-col {
 }
 
 .total-row .name-cell {
+  z-index: 5;
+}
+
+.total-row .divisi-cell {
   z-index: 5;
 }
 

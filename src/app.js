@@ -19,8 +19,8 @@
         "SELISIH",
       ],
     },
-    { id: "brand", label: "Group Brand", field: "Group Brand" },
-    { id: "prodesc", label: "Prodesc", field: "Prodesc" },
+    { id: "brand", label: "Group Brand", field: "Group Brand", showMarketingColumn: true },
+    { id: "prodesc", label: "Prodesc", field: "Prodesc", showMarketingColumn: true },
   ];
 
   const MONTH_NAMES = [
@@ -151,9 +151,11 @@
     dataRows.forEach((row) => {
       const rawName = String(row[view.field] || "").trim();
       const name = view.transform ? view.transform(rawName) : rawName || "Unassigned";
+      const divisiMarketing = String(row["Divisi Marketing"] || "Unassigned").trim() || "Unassigned";
+      const groupKey = view.showMarketingColumn ? `${divisiMarketing}|||${name}` : name;
       if (!name) return;
-      if (!grouped.has(name)) grouped.set(name, []);
-      grouped.get(name).push(row);
+      if (!grouped.has(groupKey)) grouped.set(groupKey, { name, divisiMarketing, rows: [] });
+      grouped.get(groupKey).rows.push(row);
       includedRows.push(row);
     });
 
@@ -161,8 +163,10 @@
     const totalTy = sumMonths(includedRows, year, 1, month);
     const totalLy = sumMonths(includedRows, year - 1, 1, month);
 
-    const rows = Array.from(grouped.entries()).map(([name, sourceRows]) => {
-      const targetKey = `${view.id}:${period}:${name}`;
+    const rows = Array.from(grouped.values()).map((group) => {
+      const name = group.name;
+      const sourceRows = group.rows;
+      const targetKey = `${view.id}:${period}:${group.divisiMarketing}:${name}`;
       const ytdTy = sumMonths(sourceRows, year, 1, month);
       const ytdLy = sumMonths(sourceRows, year - 1, 1, month);
       const target = targets[targetKey] ?? Math.round(ytdTy * 1.12);
@@ -177,6 +181,7 @@
 
       return {
         name,
+        divisiMarketing: group.divisiMarketing,
         target,
         ytdTy,
         ach: pct(ytdTy, target),
@@ -209,6 +214,7 @@
     const totalTarget = rows.reduce((sum, row) => sum + row.target, 0);
     const total = {
       name: "TOTAL",
+      divisiMarketing: "TOTAL",
       target: totalTarget,
       ytdTy: totalTy,
       ach: pct(totalTy, totalTarget),
@@ -349,7 +355,10 @@
 
     const normalizedSearch = search.trim().toLowerCase();
     const filteredRows = useMemo(
-      () => (normalizedSearch ? rows.filter((row) => row.name.toLowerCase().includes(normalizedSearch)) : rows),
+      () =>
+        normalizedSearch
+          ? rows.filter((row) => `${row.divisiMarketing || ""} ${row.name}`.toLowerCase().includes(normalizedSearch))
+          : rows,
       [rows, normalizedSearch]
     );
     const filteredTotal = useMemo(() => buildTotalFromRows(filteredRows, period), [filteredRows, period]);
@@ -474,7 +483,17 @@
               React.createElement(
                 "tr",
                 null,
-                React.createElement("th", { rowSpan: 2, className: "sticky-col name-col" }, React.createElement(SortButton, { column: { key: "name", label: activeView.label }, sort, onSort })),
+                activeView.showMarketingColumn &&
+                  React.createElement(
+                    "th",
+                    { rowSpan: 2, className: "sticky-col divisi-col" },
+                    React.createElement(SortButton, { column: { key: "divisiMarketing", label: "Divisi Marketing" }, sort, onSort })
+                  ),
+                React.createElement(
+                  "th",
+                  { rowSpan: 2, className: `sticky-col name-col ${activeView.showMarketingColumn ? "sticky-col-2" : ""}` },
+                  React.createElement(SortButton, { column: { key: "name", label: activeView.label }, sort, onSort })
+                ),
                 React.createElement("th", { colSpan: 4, className: "group target-head" }, "To Target"),
                 React.createElement("th", { colSpan: 3, className: "group growth-head" }, "Growth Per YTD"),
                 React.createElement("th", { colSpan: 9, className: "group average-head" }, "Growth Per Average"),
@@ -491,7 +510,7 @@
             React.createElement(
               "tbody",
               null,
-              displayRows.map((row) => React.createElement(DataRow, { key: row.total ? "total" : row.targetKey, row, columns: tableColumns, updateTarget }))
+              displayRows.map((row) => React.createElement(DataRow, { key: row.total ? "total" : row.targetKey, row, columns: tableColumns, showMarketingColumn: activeView.showMarketingColumn, updateTarget }))
             )
           )
         )
@@ -525,11 +544,12 @@
     );
   }
 
-  function DataRow({ row, columns, updateTarget }) {
+  function DataRow({ row, columns, showMarketingColumn, updateTarget }) {
     return React.createElement(
       "tr",
       { className: row.total ? "total-row" : "" },
-      React.createElement("td", { className: "sticky-col name-cell", title: row.name }, row.name),
+      showMarketingColumn && React.createElement("td", { className: "sticky-col divisi-cell", title: row.divisiMarketing }, row.divisiMarketing),
+      React.createElement("td", { className: `sticky-col name-cell ${showMarketingColumn ? "sticky-col-2" : ""}`, title: row.name }, row.total && showMarketingColumn ? "" : row.name),
       columns.map((column) => {
         const value = getCellValue(row, column.key);
         const tone = column.key === "ach" ? classify((value || 0) - 1) : column.type === "percent" || column.key.includes("gap") ? classify(value) : "";
