@@ -47,6 +47,10 @@ const assets = {
     body: fs.readFileSync(path.join(root, "data", "sales-data.js"), "utf8"),
     type: "application/javascript; charset=utf-8",
   },
+  "/data/target-data.js": {
+    body: fs.readFileSync(path.join(root, "data", "target-data.js"), "utf8"),
+    type: "application/javascript; charset=utf-8",
+  },
 };
 fs.writeFileSync(
   path.join(dist, "server", "index.js"),

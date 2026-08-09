@@ -29,6 +29,7 @@
   const PERIODS_2026 = MONTH_NAMES.map((_, index) => monthKey(2026, index + 1));
 
   const EMBEDDED_ROWS = Array.isArray(window.SALES_F2_DATA) ? window.SALES_F2_DATA : [];
+  const TARGET_ROWS = window.TARGET_F2_DATA || {};
   const STORAGE_KEY = "sales-f2-monitoring-v10";
   const TARGET_KEY = "sales-f2-targets-v1";
 
@@ -50,6 +51,21 @@
       "(BLANK)": "SELISIH",
     };
     return mapping[code] || "SELISIH";
+  }
+
+  function canonicalMarketing(value) {
+    const code = String(value || "").trim().toUpperCase();
+    const mapping = {
+      BEA: "BEAUTY",
+      BEAUTY: "BEAUTY",
+      ETH: "ETHICAL",
+      ETHICAL: "ETHICAL",
+      SUP: "SUPPLEMENT",
+      SUPPLEMENT: "SUPPLEMENT",
+      OTC: "OTC",
+      "NON PHAROS": "NON PHAROS",
+    };
+    return mapping[code] || code;
   }
 
   function numeric(value) {
@@ -92,6 +108,42 @@
   function sumMonth(sourceRows, year, month) {
     const key = monthKey(year, month);
     return sourceRows.reduce((sum, row) => sum + numeric(row[key]), 0);
+  }
+
+  function rowMonths(row) {
+    return MONTH_NAMES.map((_, index) => numeric(row[monthKey(2026, index + 1)]));
+  }
+
+  function emptyMonths() {
+    return MONTH_NAMES.map(() => 0);
+  }
+
+  function targetMonthsFor(view, group) {
+    if (!TARGET_ROWS) return emptyMonths();
+    if (view.id === "marketing") {
+      const row = (TARGET_ROWS.targetMarketingTim || []).find((item) => canonicalMarketing(item["BY MARKETING TIM"]) === canonicalMarketing(group.name));
+      return row ? rowMonths(row) : emptyMonths();
+    }
+    if (view.id === "sales") {
+      const row = (TARGET_ROWS.targetDivisi || []).find((item) => String(item["BY TIM SALES"] || "").trim().toUpperCase() === group.name.toUpperCase());
+      return row ? rowMonths(row) : emptyMonths();
+    }
+    if (view.id === "brand") {
+      const row = (TARGET_ROWS.targetBrand || []).find(
+        (item) => canonicalMarketing(item["Divisi Marketing"]) === canonicalMarketing(group.divisiMarketing) && String(item.Brand || "").trim().toUpperCase() === group.name.toUpperCase()
+      );
+      return row ? rowMonths(row) : emptyMonths();
+    }
+    if (view.id === "prodesc") {
+      const row = (TARGET_ROWS.targetProdesc || []).find(
+        (item) =>
+          canonicalMarketing(item["Divisi Marketing"]) === canonicalMarketing(group.divisiMarketing) &&
+          String(item.Brand || "").trim().toUpperCase() === String(group.groupBrand || "").trim().toUpperCase() &&
+          String(item.PRODESC || "").trim().toUpperCase() === group.name.toUpperCase()
+      );
+      return row ? rowMonths(row) : emptyMonths();
+    }
+    return emptyMonths();
   }
 
   function avgWindow(sourceRows, period, offsetStart, offsetEnd) {
@@ -152,9 +204,10 @@
       const rawName = String(row[view.field] || "").trim();
       const name = view.transform ? view.transform(rawName) : rawName || "Unassigned";
       const divisiMarketing = String(row["Divisi Marketing"] || "Unassigned").trim() || "Unassigned";
-      const groupKey = view.showMarketingColumn ? `${divisiMarketing}|||${name}` : name;
+      const groupBrand = String(row["Group Brand"] || "Unassigned").trim() || "Unassigned";
+      const groupKey = view.id === "prodesc" ? `${divisiMarketing}|||${groupBrand}|||${name}` : view.showMarketingColumn ? `${divisiMarketing}|||${name}` : name;
       if (!name) return;
-      if (!grouped.has(groupKey)) grouped.set(groupKey, { name, divisiMarketing, rows: [] });
+      if (!grouped.has(groupKey)) grouped.set(groupKey, { name, divisiMarketing, groupBrand, rows: [] });
       grouped.get(groupKey).rows.push(row);
       includedRows.push(row);
     });
@@ -167,9 +220,10 @@
       const name = group.name;
       const sourceRows = group.rows;
       const targetKey = `${view.id}:${period}:${group.divisiMarketing}:${name}`;
+      const targetTrend = targetMonthsFor(view, group);
       const ytdTy = sumMonths(sourceRows, year, 1, month);
       const ytdLy = sumMonths(sourceRows, year - 1, 1, month);
-      const target = targets[targetKey] ?? Math.round(ytdTy * 1.12);
+      const target = targetTrend.slice(0, month).reduce((sum, value) => sum + value, 0);
       const avgLy = month ? ytdLy / month : 0;
       const avgTy = month ? ytdTy / month : 0;
       const avgB01 = avgWindow(sourceRows, period, 0, 1);
@@ -182,6 +236,7 @@
       return {
         name,
         divisiMarketing: group.divisiMarketing,
+        groupBrand: group.groupBrand,
         target,
         ytdTy,
         ach: pct(ytdTy, target),
@@ -201,6 +256,7 @@
         contTy: pct(ytdTy, totalTy),
         history2025,
         actual2026,
+        targetTrend,
         targetKey,
       };
     });
@@ -234,6 +290,7 @@
       contTy: 1,
       history2025: MONTH_NAMES.map((_, index) => sumMonth(includedRows, year - 1, index + 1)),
       actual2026: MONTH_NAMES.map((_, index) => sumMonth(includedRows, year, index + 1)),
+      targetTrend: rows.reduce((months, row) => months.map((sum, index) => sum + numeric(row.targetTrend[index])), emptyMonths()),
       total: true,
     };
 
@@ -243,6 +300,7 @@
   function getCellValue(row, key) {
     if (key.startsWith("history2025.")) return row.history2025[Number(key.split(".")[1])];
     if (key.startsWith("actual2026.")) return row.actual2026[Number(key.split(".")[1])];
+    if (key.startsWith("targetTrend.")) return row.targetTrend[Number(key.split(".")[1])];
     if (key === "actualYtd") return row.ytdTy;
     if (key === "ytdTyGrowth") return row.ytdTy;
     return row[key];
@@ -292,15 +350,16 @@
       contTy: 1,
       history2025: MONTH_NAMES.map((_, index) => rows.reduce((sum, row) => sum + numeric(row.history2025[index]), 0)),
       actual2026: MONTH_NAMES.map((_, index) => rows.reduce((sum, row) => sum + numeric(row.actual2026[index]), 0)),
+      targetTrend: MONTH_NAMES.map((_, index) => rows.reduce((sum, row) => sum + numeric(row.targetTrend[index]), 0)),
       total: true,
     };
   }
 
-  function getTableColumns(period, showHistory) {
+  function getTableColumns(period, showHistory, showTargetTrend) {
     const month = Number(period.slice(4, 6));
     const year = Number(period.slice(0, 4));
     const columns = [
-      { key: "target", label: `Target YTD ${monthLabel(period)}`, type: "number", editable: true },
+      { key: "target", label: `Target YTD ${monthLabel(period)}`, type: "number" },
       { key: "actualYtd", label: `Actual YTD ${monthLabel(period)}`, type: "number" },
       { key: "ach", label: "ACH (%)", type: "percent" },
       { key: "gapTarget", label: "Gap to Target", type: "number" },
@@ -325,6 +384,10 @@
       MONTH_NAMES.forEach((name, index) => columns.push({ key: `actual2026.${index}`, label: `${name} 2026`, type: "number", history: true }));
     }
 
+    if (showTargetTrend) {
+      MONTH_NAMES.forEach((name, index) => columns.push({ key: `targetTrend.${index}`, label: `${name} Target`, type: "number", targetTrend: true }));
+    }
+
     return columns;
   }
 
@@ -335,8 +398,12 @@
     const [status] = useState(`${EMBEDDED_ROWS.length.toLocaleString("id-ID")} rows loaded from Sales F2.xlsx.`);
     const [period, setPeriod] = useState("202606");
     const [showHistory, setShowHistory] = useState(false);
+    const [showTargetTrend, setShowTargetTrend] = useState(false);
     const [sort, setSort] = useState({ key: null, direction: "desc" });
     const [search, setSearch] = useState("");
+    const [marketingFilter, setMarketingFilter] = useState("all");
+    const [brandFilter, setBrandFilter] = useState("all");
+    const [prodescFilter, setProdescFilter] = useState("all");
     const [page, setPage] = useState(1);
     const [alertPeriod, setAlertPeriod] = useState(null);
     const pageSize = 11;
@@ -354,12 +421,22 @@
     }
 
     const normalizedSearch = search.trim().toLowerCase();
+    const filterOptions = useMemo(() => {
+      const marketing = Array.from(new Set(rows.map((row) => row.divisiMarketing).filter(Boolean))).sort();
+      const brands = Array.from(new Set(rows.map((row) => (activeView.id === "prodesc" ? row.groupBrand : row.name)).filter(Boolean))).sort();
+      const prodescs = Array.from(new Set(rows.map((row) => row.name).filter(Boolean))).sort();
+      return { marketing, brands, prodescs };
+    }, [rows, activeView.id]);
     const filteredRows = useMemo(
       () =>
-        normalizedSearch
-          ? rows.filter((row) => `${row.divisiMarketing || ""} ${row.name}`.toLowerCase().includes(normalizedSearch))
-          : rows,
-      [rows, normalizedSearch]
+        rows.filter((row) => {
+          const matchesSearch = !normalizedSearch || `${row.divisiMarketing || ""} ${row.groupBrand || ""} ${row.name}`.toLowerCase().includes(normalizedSearch);
+          const matchesMarketing = !activeView.showMarketingColumn || marketingFilter === "all" || row.divisiMarketing === marketingFilter;
+          const matchesBrand = activeView.id !== "brand" && activeView.id !== "prodesc" ? true : brandFilter === "all" || (activeView.id === "brand" ? row.name === brandFilter : row.groupBrand === brandFilter);
+          const matchesProdesc = activeView.id !== "prodesc" || prodescFilter === "all" || row.name === prodescFilter;
+          return matchesSearch && matchesMarketing && matchesBrand && matchesProdesc;
+        }),
+      [rows, normalizedSearch, activeView.id, activeView.showMarketingColumn, marketingFilter, brandFilter, prodescFilter]
     );
     const filteredTotal = useMemo(() => buildTotalFromRows(filteredRows, period), [filteredRows, period]);
     const summary = filteredTotal || {};
@@ -370,7 +447,7 @@
     const currentPage = Math.min(page, totalPages);
     const pagedRows = sortedRows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
     const displayRows = [...pagedRows, filteredTotal];
-    const tableColumns = getTableColumns(period, showHistory);
+    const tableColumns = getTableColumns(period, showHistory, showTargetTrend);
 
     useEffect(() => {
       if (total && numeric(currentMonthActual) === 0) setAlertPeriod(period);
@@ -378,7 +455,13 @@
 
     useEffect(() => {
       setPage(1);
-    }, [search, activeViewId, period, showHistory]);
+    }, [search, activeViewId, period, showHistory, showTargetTrend, marketingFilter, brandFilter, prodescFilter]);
+
+    useEffect(() => {
+      setMarketingFilter("all");
+      setBrandFilter("all");
+      setProdescFilter("all");
+    }, [activeViewId]);
 
     function onPeriodChange(value) {
       setPeriod(value);
@@ -423,6 +506,12 @@
             { className: "toggle-control" },
             React.createElement("input", { type: "checkbox", checked: showHistory, onChange: (event) => setShowHistory(event.target.checked) }),
             React.createElement("span", null, "History Sales")
+          ),
+          React.createElement(
+            "label",
+            { className: "toggle-control" },
+            React.createElement("input", { type: "checkbox", checked: showTargetTrend, onChange: (event) => setShowTargetTrend(event.target.checked) }),
+            React.createElement("span", null, "Target Trend")
           )
         )
       ),
@@ -460,6 +549,27 @@
             placeholder: "Search...",
             "aria-label": "Search table",
           }),
+          activeView.showMarketingColumn &&
+            React.createElement(
+              "select",
+              { className: "filter-select", value: marketingFilter, onChange: (event) => setMarketingFilter(event.target.value), "aria-label": "Filter Marketing" },
+              React.createElement("option", { value: "all" }, "All Marketing"),
+              filterOptions.marketing.map((item) => React.createElement("option", { key: item, value: item }, item))
+            ),
+          (activeView.id === "brand" || activeView.id === "prodesc") &&
+            React.createElement(
+              "select",
+              { className: "filter-select", value: brandFilter, onChange: (event) => setBrandFilter(event.target.value), "aria-label": "Filter Group Brand" },
+              React.createElement("option", { value: "all" }, "All Group Brand"),
+              filterOptions.brands.map((item) => React.createElement("option", { key: item, value: item }, item))
+            ),
+          activeView.id === "prodesc" &&
+            React.createElement(
+              "select",
+              { className: "filter-select wide-filter", value: prodescFilter, onChange: (event) => setProdescFilter(event.target.value), "aria-label": "Filter Prodesc" },
+              React.createElement("option", { value: "all" }, "All Prodesc"),
+              filterOptions.prodescs.map((item) => React.createElement("option", { key: item, value: item }, item))
+            ),
           React.createElement(
             "div",
             { className: "pager" },
@@ -499,12 +609,13 @@
                 React.createElement("th", { colSpan: 9, className: "group average-head" }, "Growth Per Average"),
                 React.createElement("th", { colSpan: 2, className: "group cont-head" }, "Contribution"),
                 showHistory && React.createElement("th", { colSpan: 12, className: "group history-head" }, "History Sales 2025"),
-                showHistory && React.createElement("th", { colSpan: 12, className: "group actual-head" }, "Actual 2026")
+                showHistory && React.createElement("th", { colSpan: 12, className: "group actual-head" }, "Actual 2026"),
+                showTargetTrend && React.createElement("th", { colSpan: 12, className: "group target-trend-head" }, "Target Trend 2026")
               ),
               React.createElement(
                 "tr",
                 null,
-                tableColumns.map((column) => React.createElement("th", { key: column.key, className: column.history ? "history-col" : "" }, React.createElement(SortButton, { column, sort, onSort })))
+                tableColumns.map((column) => React.createElement("th", { key: column.key, className: `${column.history ? "history-col" : ""} ${column.targetTrend ? "target-trend-col" : ""}` }, React.createElement(SortButton, { column, sort, onSort })))
               )
             ),
             React.createElement(
@@ -562,7 +673,7 @@
               : React.createElement("input", { value: Math.round(row.target), onChange: (event) => updateTarget(row.targetKey, event.target.value), "aria-label": `Target for ${row.name}` })
           );
         }
-        return React.createElement("td", { key: column.key, className: `${tone} ${column.history ? "history-col" : ""}` }, column.type === "percent" ? formatPct(value) : formatNumber(value));
+        return React.createElement("td", { key: column.key, className: `${tone} ${column.history ? "history-col" : ""} ${column.targetTrend ? "target-trend-col" : ""}` }, column.type === "percent" ? formatPct(value) : formatNumber(value));
       })
     );
   }

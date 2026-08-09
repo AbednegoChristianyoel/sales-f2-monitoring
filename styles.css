@@ -230,6 +230,22 @@ select {
   color: var(--ink);
 }
 
+.filter-select {
+  width: 190px;
+  height: 36px;
+  border: 1px solid #111;
+  border-radius: 8px;
+  background: #fff;
+  padding: 0 10px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.wide-filter {
+  width: min(360px, 100%);
+}
+
 .pager {
   display: flex;
   align-items: center;
@@ -346,6 +362,10 @@ thead tr:nth-child(2) th {
 
 .actual-head {
   background: #6b4b8f;
+}
+
+.target-trend-head {
+  background: #0f6f8c;
 }
 
 .sticky-col {
@@ -467,6 +487,10 @@ thead tr:first-child .group {
   background: #fbfcfe;
 }
 
+.target-trend-col {
+  background: #f0fbff;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -528,6 +552,11 @@ thead tr:first-child .group {
   }
 
   .search-input {
+    width: 100%;
+  }
+
+  .filter-select,
+  .wide-filter {
     width: 100%;
   }
 
