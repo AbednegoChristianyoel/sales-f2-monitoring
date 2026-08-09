@@ -450,12 +450,22 @@ th.sticky-col {
 
 .name-cell,
 .divisi-cell,
-.item-code-cell {
+.item-code-cell,
+.total-label-cell {
   overflow: hidden;
   background: #fff;
   font-weight: 900;
   text-overflow: ellipsis;
   box-shadow: 8px 0 18px rgba(15, 23, 42, 0.06);
+}
+
+.total-label-cell {
+  text-align: center;
+}
+
+.total-label-wide {
+  min-width: 540px;
+  max-width: 640px;
 }
 
 .editable-cell input {
@@ -484,6 +494,11 @@ th.sticky-col {
 
 .total-row .divisi-cell {
   z-index: 5;
+}
+
+.total-row .total-label-cell {
+  z-index: 7;
+  background: #fff1b8;
 }
 
 .sort-button {

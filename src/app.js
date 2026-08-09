@@ -515,6 +515,7 @@
 
     const exportRows = [...rows, total];
     exportRows.forEach((row, rowIndex) => {
+      const rowNumber = rowIndex + 3;
       const excelRow = sheet.getRow(rowIndex + 3);
       allColumns.forEach((column, colIndex) => {
         const cell = excelRow.getCell(colIndex + 1);
@@ -525,6 +526,10 @@
         if (column.type === "percent") cell.numFmt = "0.00%";
         if (column.type === "number") cell.numFmt = "#,##0";
       });
+      if (row.total && leftHeaders.length > 1) {
+        sheet.mergeCells(rowNumber, 1, rowNumber, leftHeaders.length);
+        sheet.getCell(rowNumber, 1).value = "TOTAL";
+      }
     });
 
     const headerFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF7F9FC" } };
@@ -899,12 +904,17 @@
   }
 
   function DataRow({ row, columns, showMarketingColumn, showItemCodeColumn, updateTarget }) {
+    const leftColumnSpan = showItemCodeColumn ? 3 : showMarketingColumn ? 2 : 1;
     return React.createElement(
       "tr",
       { className: row.total ? "total-row" : "" },
-      showMarketingColumn && React.createElement("td", { className: "sticky-col divisi-cell", title: row.divisiMarketing }, row.divisiMarketing),
-      showItemCodeColumn && React.createElement("td", { className: "sticky-col item-code-cell sticky-col-2", title: row.itemCode }, row.total ? "" : row.itemCode),
-      React.createElement("td", { className: `sticky-col name-cell ${showItemCodeColumn ? "sticky-col-3" : showMarketingColumn ? "sticky-col-2" : ""}`, title: row.name }, row.total && showMarketingColumn ? "" : row.name),
+      row.total
+        ? React.createElement("td", { colSpan: leftColumnSpan, className: `sticky-col total-label-cell ${showItemCodeColumn ? "total-label-wide" : ""}`, title: "TOTAL" }, "TOTAL")
+        : [
+            showMarketingColumn && React.createElement("td", { key: "divisiMarketing", className: "sticky-col divisi-cell", title: row.divisiMarketing }, row.divisiMarketing),
+            showItemCodeColumn && React.createElement("td", { key: "itemCode", className: "sticky-col item-code-cell sticky-col-2", title: row.itemCode }, row.itemCode),
+            React.createElement("td", { key: "name", className: `sticky-col name-cell ${showItemCodeColumn ? "sticky-col-3" : showMarketingColumn ? "sticky-col-2" : ""}`, title: row.name }, row.name),
+          ],
       columns.map((column) => {
         const value = getCellValue(row, column.key);
         const tone = column.key === "ach" ? classify((value || 0) - 1) : column.type === "percent" || column.key.includes("gap") ? classify(value) : "";
