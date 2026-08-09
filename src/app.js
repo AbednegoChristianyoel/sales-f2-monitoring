@@ -2,7 +2,7 @@
   const { useEffect, useMemo, useState } = React;
 
   const VIEW_CONFIG = [
-    { id: "marketing", label: "Marketing Team", field: "Divisi Marketing" },
+    { id: "marketing", label: "Marketing Team", field: "Divisi Marketing", transform: marketingTeamName },
     {
       id: "sales",
       label: "Sales Team",
@@ -63,9 +63,16 @@
       SUP: "SUPPLEMENT",
       SUPPLEMENT: "SUPPLEMENT",
       OTC: "OTC",
-      "NON PHAROS": "NON PHAROS",
+      "NON PHAROS": "SELISIH",
+      SELISIH: "SELISIH",
     };
     return mapping[code] || code;
+  }
+
+  function marketingTeamName(value) {
+    const code = String(value || "").trim();
+    const canonical = canonicalMarketing(code);
+    return canonical || "Unassigned";
   }
 
   function numeric(value) {
@@ -158,7 +165,7 @@
   function seedTargetGroups(grouped, view) {
     if (view.id === "brand") {
       (TARGET_ROWS.targetBrand || []).forEach((item) => {
-        const divisiMarketing = String(item["Divisi Marketing"] || "Unassigned").trim() || "Unassigned";
+        const divisiMarketing = marketingTeamName(item["Divisi Marketing"]);
         const name = String(item.Brand || "Unassigned").trim() || "Unassigned";
         const key = groupKeyFor(view, divisiMarketing, name, name);
         if (!grouped.has(key)) grouped.set(key, { name, divisiMarketing, groupBrand: name, rows: [] });
@@ -166,7 +173,7 @@
     }
     if (view.id === "prodesc") {
       (TARGET_ROWS.targetProdesc || []).forEach((item) => {
-        const divisiMarketing = String(item["Divisi Marketing"] || "Unassigned").trim() || "Unassigned";
+        const divisiMarketing = marketingTeamName(item["Divisi Marketing"]);
         const groupBrand = String(item.Brand || "Unassigned").trim() || "Unassigned";
         const name = String(item.PRODESC || "Unassigned").trim() || "Unassigned";
         const key = groupKeyFor(view, divisiMarketing, groupBrand, name);
@@ -233,7 +240,7 @@
     dataRows.forEach((row) => {
       const rawName = String(row[view.field] || "").trim();
       const name = view.transform ? view.transform(rawName) : rawName || "Unassigned";
-      const divisiMarketing = String(row["Divisi Marketing"] || "Unassigned").trim() || "Unassigned";
+      const divisiMarketing = marketingTeamName(row["Divisi Marketing"]);
       const groupBrand = String(row["Group Brand"] || "Unassigned").trim() || "Unassigned";
       const groupKey = groupKeyFor(view, divisiMarketing, groupBrand, name);
       if (!name) return;
