@@ -3,7 +3,22 @@
 
   const VIEW_CONFIG = [
     { id: "marketing", label: "Marketing Team", field: "Divisi Marketing" },
-    { id: "sales", label: "Sales Team", field: "DIVISI" },
+    {
+      id: "sales",
+      label: "Sales Team",
+      field: "DIVISI",
+      transform: salesTeamName,
+      order: [
+        "TRADING - OMEGA NEW",
+        "TRADING - VIBRANT",
+        "SERVICES - KAM",
+        "SERVICES - HOSPINET",
+        "CENTURY (Mall & Online)",
+        "ALPRO",
+        "PELAPAK INTERNAL",
+        "SELISIH",
+      ],
+    },
     { id: "brand", label: "Group Brand", field: "Group Brand" },
     { id: "prodesc", label: "Prodesc", field: "Prodesc" },
   ];
@@ -22,6 +37,26 @@
 
   const STORAGE_KEY = "sales-f2-monitoring-v1";
   const TARGET_KEY = "sales-f2-targets-v1";
+
+  function salesTeamName(value) {
+    const code = String(value || "").trim().toUpperCase();
+    const mapping = {
+      OMG1: "TRADING - OMEGA NEW",
+      VBR: "TRADING - VIBRANT",
+      KAM: "SERVICES - KAM",
+      KAM1: "SERVICES - KAM",
+      KAM2: "SERVICES - KAM",
+      KAM3: "SERVICES - KAM",
+      HPH1: "SERVICES - HOSPINET",
+      HPH3: "SERVICES - HOSPINET",
+      CENTURY: "CENTURY (Mall & Online)",
+      "CENTURY ONLINE": "CENTURY (Mall & Online)",
+      ALPRO: "ALPRO",
+      "PELAPAK INTERNAL": "PELAPAK INTERNAL",
+      "(BLANK)": "SELISIH",
+    };
+    return mapping[code] || value || "SELISIH";
+  }
 
   function numeric(value) {
     if (value === null || value === undefined || value === "") return 0;
@@ -114,7 +149,8 @@
   function buildRows(dataRows, view, period, targets) {
     const grouped = new Map();
     dataRows.forEach((row) => {
-      const name = String(row[view.field] || "Unassigned").trim() || "Unassigned";
+      const rawName = String(row[view.field] || "").trim();
+      const name = view.transform ? view.transform(rawName) : rawName || "Unassigned";
       if (!grouped.has(name)) grouped.set(name, []);
       grouped.get(name).push(row);
     });
@@ -158,7 +194,12 @@
       };
     });
 
-    rows.sort((a, b) => b.ytdTy - a.ytdTy);
+    if (view.order) {
+      const orderMap = new Map(view.order.map((name, index) => [name, index]));
+      rows.sort((a, b) => (orderMap.get(a.name) ?? 999) - (orderMap.get(b.name) ?? 999) || b.ytdTy - a.ytdTy);
+    } else {
+      rows.sort((a, b) => b.ytdTy - a.ytdTy);
+    }
     const totalTarget = rows.reduce((sum, row) => sum + row.target, 0);
     const total = {
       name: "TOTAL",
