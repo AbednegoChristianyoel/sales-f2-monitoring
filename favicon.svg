@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <rect width="128" height="128" rx="22" fill="#ffffff"/>
+  <path d="M40 103c2-22 5-45 10-69" fill="none" stroke="#008f65" stroke-width="7" stroke-linecap="round"/>
+  <path d="M58 106c1-27 4-55 11-84" fill="none" stroke="#08a66d" stroke-width="7" stroke-linecap="round"/>
+  <path d="M29 45c18-27 55-34 68-18 13 17-8 43-42 44" fill="none" stroke="#00749b" stroke-width="9" stroke-linecap="round"/>
+  <path d="M49 76c14-3 27-10 34-21" fill="none" stroke="#00749b" stroke-width="8" stroke-linecap="round"/>
+  <path d="M31 111h66" stroke="#0b4f84" stroke-width="5" stroke-linecap="round"/>
+  <text x="64" y="123" text-anchor="middle" font-family="Georgia, serif" font-size="16" font-weight="700" fill="#0b4f84">PHAROS</text>
+</svg>
