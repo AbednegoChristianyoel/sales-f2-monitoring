@@ -16,6 +16,7 @@
         "CENTURY (Mall & Online)",
         "ALPRO",
         "PELAPAK INTERNAL",
+        "SELISIH",
       ],
     },
     { id: "brand", label: "Group Brand", field: "Group Brand" },
@@ -26,15 +27,8 @@
     "JAN", "FEB", "MAR", "APR", "MEI", "JUN", "JUL", "AGU", "SEP", "OKT", "NOV", "DES",
   ];
 
-  const DEMO_ROWS = [
-    { "Divisi Marketing": "BEAUTY", DIVISI: "ALPRO", "Group Brand": "AYU DERMA", Prodesc: "AYU DERMA FACIAL FOAM", 202501: 752400, 202502: 3135000, 202503: 209000, 202504: 1985500, 202505: 689700, 202601: 840000, 202602: 3380000, 202603: 508000, 202604: 2230000, 202605: 920000, 202606: 540000 },
-    { "Divisi Marketing": "BEAUTY", DIVISI: "CENTURY", "Group Brand": "AYU DERMA", Prodesc: "AYU DERMA NIGHT CREAM", 202501: 259200, 202502: 0, 202503: 291600, 202504: 356400, 202505: 64800, 202506: 162000, 202601: 1198800, 202602: 32400, 202603: 0, 202604: 0, 202605: 0, 202606: -356400 },
-    { "Divisi Marketing": "OTC", DIVISI: "TRADING - OMEGA NEW", "Group Brand": "OMEGA", Prodesc: "OMEGA MULTIVITAMIN", 202501: 35200000, 202502: 44100000, 202503: 38800000, 202504: 40200000, 202505: 41500000, 202506: 38900000, 202601: 38600000, 202602: 42600000, 202603: 45100000, 202604: 41200000, 202605: 43500000, 202606: 44100000 },
-    { "Divisi Marketing": "ETH", DIVISI: "SERVICES - KAM", "Group Brand": "HEALTHPRO", Prodesc: "HEALTHPRO SYRUP", 202501: 18300000, 202502: 19200000, 202503: 21100000, 202504: 20300000, 202505: 19800000, 202506: 22100000, 202601: 21500000, 202602: 23300000, 202603: 22600000, 202604: 24700000, 202605: 24100000, 202606: 25200000 },
-    { "Divisi Marketing": "SUP", DIVISI: "PELAPAK INTERNAL", "Group Brand": "SUPRA", Prodesc: "SUPRA DAILY CARE", 202501: 10300000, 202502: 9800000, 202503: 11600000, 202504: 12400000, 202505: 12100000, 202506: 11800000, 202601: 9600000, 202602: 10900000, 202603: 10400000, 202604: 11200000, 202605: 10100000, 202606: 9900000 },
-  ];
-
-  const STORAGE_KEY = "sales-f2-monitoring-v1";
+  const EMBEDDED_ROWS = Array.isArray(window.SALES_F2_DATA) ? window.SALES_F2_DATA : [];
+  const STORAGE_KEY = "sales-f2-monitoring-v10";
   const TARGET_KEY = "sales-f2-targets-v1";
 
   function salesTeamName(value) {
@@ -52,8 +46,9 @@
       "CENTURY ONLINE": "CENTURY (Mall & Online)",
       ALPRO: "ALPRO",
       "PELAPAK INTERNAL": "PELAPAK INTERNAL",
+      "(BLANK)": "SELISIH",
     };
-    return mapping[code] || value || null;
+    return mapping[code] || "SELISIH";
   }
 
   function numeric(value) {
@@ -228,10 +223,10 @@
   }
 
   function App() {
-    const [dataRows, setDataRows] = useState(() => safeLoad(STORAGE_KEY, DEMO_ROWS));
+    const [dataRows, setDataRows] = useState(() => safeLoad(STORAGE_KEY, EMBEDDED_ROWS));
     const [targets, setTargets] = useState(() => safeLoad(TARGET_KEY, {}));
     const [activeViewId, setActiveViewId] = useState("marketing");
-    const [status, setStatus] = useState("Demo data loaded. Upload Sales F2.xlsx to use your latest database.");
+    const [status, setStatus] = useState(`${EMBEDDED_ROWS.length.toLocaleString("id-ID")} rows loaded from Sales F2.xlsx.`);
     const monthColumns = useMemo(() => findMonthColumns(dataRows), [dataRows]);
     const [period, setPeriod] = useState("");
 

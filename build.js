@@ -23,6 +23,7 @@ fs.rmSync(dist, { recursive: true, force: true });
 copyFile(path.join(root, "index.html"), path.join(dist, "index.html"));
 copyFile(path.join(root, "styles.css"), path.join(dist, "styles.css"));
 copyFile(path.join(root, ".openai", "hosting.json"), path.join(dist, ".openai", "hosting.json"));
+copyDir(path.join(root, "data"), path.join(dist, "data"));
 copyDir(path.join(root, "src"), path.join(dist, "src"));
 fs.mkdirSync(path.join(dist, "server"), { recursive: true });
 const assets = {
@@ -40,6 +41,10 @@ const assets = {
   },
   "/src/app.js": {
     body: fs.readFileSync(path.join(root, "src", "app.js"), "utf8"),
+    type: "application/javascript; charset=utf-8",
+  },
+  "/data/sales-data.js": {
+    body: fs.readFileSync(path.join(root, "data", "sales-data.js"), "utf8"),
     type: "application/javascript; charset=utf-8",
   },
 };
