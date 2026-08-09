@@ -574,7 +574,7 @@
 
     const normalizedSearch = search.trim().toLowerCase();
     const filterOptions = useMemo(() => {
-      const marketing = Array.from(new Set(rows.map((row) => row.divisiMarketing).filter(Boolean))).sort();
+      const marketing = Array.from(new Set(rows.map((row) => row.divisiMarketing).filter((item) => item && item !== "SELISIH"))).sort();
       const brands = Array.from(new Set(rows.map((row) => (activeView.id === "prodesc" ? row.groupBrand : row.name)).filter(Boolean))).sort();
       const prodescs = Array.from(new Set(rows.map((row) => row.name).filter(Boolean))).sort();
       return { marketing, brands, prodescs };
