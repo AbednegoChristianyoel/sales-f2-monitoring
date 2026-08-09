@@ -658,7 +658,7 @@
           null,
           React.createElement("p", { className: "eyebrow" }, "Sales performance monitoring"),
           React.createElement("h1", null, "SALES F2 DASHBOARD"),
-          React.createElement("p", { className: "subtitle" }, "Monitoring Target, Actual Sales, Achievement, Growth, Moving Average, dan Kontribusi Sales Pharos 2026")
+          React.createElement("p", { className: "subtitle" }, "Monitoring Target, Actual Sales, Achievement, Growth, Moving Average, dan Kontribusi Sales")
         ),
         React.createElement(
           "div",
