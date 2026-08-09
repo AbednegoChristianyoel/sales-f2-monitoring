@@ -114,18 +114,18 @@ select {
 
 .download-button {
   height: 42px;
-  border: 1px solid #66b8ff;
+  border: 1px solid #2bd67b;
   border-radius: 8px;
-  background: #0f5fa8;
+  background: #16884f;
   color: #fff;
   padding: 0 16px;
   font-weight: 900;
   cursor: pointer;
-  box-shadow: 0 10px 22px rgba(15, 95, 168, 0.25);
+  box-shadow: 0 10px 22px rgba(22, 136, 79, 0.25);
 }
 
 .download-button:hover {
-  background: #1370c8;
+  background: #1da863;
 }
 
 .summary-grid {
@@ -246,6 +246,11 @@ select {
   color: var(--ink);
 }
 
+.filter-search {
+  position: relative;
+  width: 190px;
+}
+
 .filter-select {
   width: 190px;
   height: 36px;
@@ -260,6 +265,28 @@ select {
 
 .wide-filter {
   width: min(360px, 100%);
+}
+
+.filter-search .filter-select {
+  width: 100%;
+  padding-right: 30px;
+}
+
+.filter-search button {
+  position: absolute;
+  top: 50%;
+  right: 7px;
+  width: 20px;
+  height: 20px;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 999px;
+  background: #dfe7f2;
+  color: #172033;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 20px;
+  cursor: pointer;
 }
 
 .pager {
@@ -406,8 +433,8 @@ thead tr:nth-child(2) th {
 
 th.sticky-col {
   z-index: 8;
-  background: #172033;
-  color: #fff;
+  background: #eaf4ff;
+  color: #071324;
 }
 
 .name-cell,
@@ -483,6 +510,10 @@ th.sticky-col {
 th.sticky-col .sort-button,
 .group .sort-button {
   color: #fff;
+}
+
+th.sticky-col .sort-button {
+  color: #071324;
 }
 
 th.sticky-col .sort-button {
@@ -574,6 +605,10 @@ thead tr:first-child .group {
 
   .filter-select,
   .wide-filter {
+    width: 100%;
+  }
+
+  .filter-search {
     width: 100%;
   }
 

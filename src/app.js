@@ -576,9 +576,13 @@
       () =>
         rows.filter((row) => {
           const matchesSearch = !normalizedSearch || `${row.divisiMarketing || ""} ${row.groupBrand || ""} ${row.name}`.toLowerCase().includes(normalizedSearch);
-          const matchesMarketing = !activeView.showMarketingColumn || marketingFilter === "all" || row.divisiMarketing === marketingFilter;
-          const matchesBrand = activeView.id !== "brand" && activeView.id !== "prodesc" ? true : brandFilter === "all" || (activeView.id === "brand" ? row.name === brandFilter : row.groupBrand === brandFilter);
-          const matchesProdesc = activeView.id !== "prodesc" || prodescFilter === "all" || row.name === prodescFilter;
+          const marketingText = marketingFilter === "all" ? "" : marketingFilter.toLowerCase();
+          const brandText = brandFilter === "all" ? "" : brandFilter.toLowerCase();
+          const prodescText = prodescFilter === "all" ? "" : prodescFilter.toLowerCase();
+          const matchesMarketing = !activeView.showMarketingColumn || !marketingText || row.divisiMarketing.toLowerCase().includes(marketingText);
+          const brandValue = activeView.id === "brand" ? row.name : row.groupBrand;
+          const matchesBrand = activeView.id !== "brand" && activeView.id !== "prodesc" ? true : !brandText || brandValue.toLowerCase().includes(brandText);
+          const matchesProdesc = activeView.id !== "prodesc" || !prodescText || row.name.toLowerCase().includes(prodescText);
           return matchesSearch && matchesMarketing && matchesBrand && matchesProdesc;
         }),
       [rows, normalizedSearch, activeView.id, activeView.showMarketingColumn, marketingFilter, brandFilter, prodescFilter]
@@ -635,7 +639,7 @@
           "div",
           null,
           React.createElement("p", { className: "eyebrow" }, "Sales performance monitoring"),
-          React.createElement("h1", null, "Sales F2 Dashboard"),
+          React.createElement("h1", null, "SALES F2 DASHBOARD"),
           React.createElement("p", { className: "subtitle" }, "Monitoring Target, Actual Sales, Achievement, Growth, Moving Average, dan Kontribusi Sales Pharos 2026")
         ),
         React.createElement(
@@ -712,26 +716,30 @@
             "aria-label": "Search table",
           }),
           activeView.showMarketingColumn &&
-            React.createElement(
-              "select",
-              { className: "filter-select", value: marketingFilter, onChange: (event) => setMarketingFilter(event.target.value), "aria-label": "Filter Marketing" },
-              React.createElement("option", { value: "all" }, "All Marketing"),
-              filterOptions.marketing.map((item) => React.createElement("option", { key: item, value: item }, item))
-            ),
+            React.createElement(FilterSearch, {
+              id: "marketing-filter",
+              label: "All Marketing",
+              value: marketingFilter,
+              options: filterOptions.marketing,
+              onChange: setMarketingFilter,
+            }),
           (activeView.id === "brand" || activeView.id === "prodesc") &&
-            React.createElement(
-              "select",
-              { className: "filter-select", value: brandFilter, onChange: (event) => setBrandFilter(event.target.value), "aria-label": "Filter Group Brand" },
-              React.createElement("option", { value: "all" }, "All Group Brand"),
-              filterOptions.brands.map((item) => React.createElement("option", { key: item, value: item }, item))
-            ),
+            React.createElement(FilterSearch, {
+              id: "brand-filter",
+              label: "All Group Brand",
+              value: brandFilter,
+              options: filterOptions.brands,
+              onChange: setBrandFilter,
+            }),
           activeView.id === "prodesc" &&
-            React.createElement(
-              "select",
-              { className: "filter-select wide-filter", value: prodescFilter, onChange: (event) => setProdescFilter(event.target.value), "aria-label": "Filter Prodesc" },
-              React.createElement("option", { value: "all" }, "All Prodesc"),
-              filterOptions.prodescs.map((item) => React.createElement("option", { key: item, value: item }, item))
-            ),
+            React.createElement(FilterSearch, {
+              id: "prodesc-filter",
+              label: "All Prodesc",
+              value: prodescFilter,
+              options: filterOptions.prodescs,
+              onChange: setProdescFilter,
+              wide: true,
+            }),
           React.createElement(
             "div",
             { className: "pager" },
@@ -805,6 +813,33 @@
 
   function SummaryCard({ label, value, tone }) {
     return React.createElement("article", { className: `summary-card ${tone || ""}` }, React.createElement("span", null, label), React.createElement("strong", null, value));
+  }
+
+  function FilterSearch({ id, label, value, options, onChange, wide }) {
+    const inputValue = value === "all" ? "" : value;
+    return React.createElement(
+      "div",
+      { className: `filter-search ${wide ? "wide-filter" : ""}` },
+      React.createElement("input", {
+        className: "filter-select",
+        list: id,
+        value: inputValue,
+        onChange: (event) => onChange(event.target.value || "all"),
+        placeholder: label,
+        "aria-label": label,
+      }),
+      inputValue &&
+        React.createElement(
+          "button",
+          { type: "button", onClick: () => onChange("all"), title: `Clear ${label}` },
+          "x"
+        ),
+      React.createElement(
+        "datalist",
+        { id },
+        options.map((item) => React.createElement("option", { key: item, value: item }))
+      )
+    );
   }
 
   function SortButton({ column, sort, onSort }) {
