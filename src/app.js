@@ -146,6 +146,32 @@
     return emptyMonths();
   }
 
+  function groupKeyFor(view, divisiMarketing, groupBrand, name) {
+    if (view.id === "prodesc") return `${divisiMarketing}|||${groupBrand}|||${name}`;
+    if (view.showMarketingColumn) return `${divisiMarketing}|||${name}`;
+    return name;
+  }
+
+  function seedTargetGroups(grouped, view) {
+    if (view.id === "brand") {
+      (TARGET_ROWS.targetBrand || []).forEach((item) => {
+        const divisiMarketing = String(item["Divisi Marketing"] || "Unassigned").trim() || "Unassigned";
+        const name = String(item.Brand || "Unassigned").trim() || "Unassigned";
+        const key = groupKeyFor(view, divisiMarketing, name, name);
+        if (!grouped.has(key)) grouped.set(key, { name, divisiMarketing, groupBrand: name, rows: [] });
+      });
+    }
+    if (view.id === "prodesc") {
+      (TARGET_ROWS.targetProdesc || []).forEach((item) => {
+        const divisiMarketing = String(item["Divisi Marketing"] || "Unassigned").trim() || "Unassigned";
+        const groupBrand = String(item.Brand || "Unassigned").trim() || "Unassigned";
+        const name = String(item.PRODESC || "Unassigned").trim() || "Unassigned";
+        const key = groupKeyFor(view, divisiMarketing, groupBrand, name);
+        if (!grouped.has(key)) grouped.set(key, { name, divisiMarketing, groupBrand, rows: [] });
+      });
+    }
+  }
+
   function avgWindow(sourceRows, period, offsetStart, offsetEnd) {
     const { year, month } = periodParts(period);
     let total = 0;
@@ -200,12 +226,13 @@
   function buildRows(dataRows, view, period, targets) {
     const grouped = new Map();
     const includedRows = [];
+    seedTargetGroups(grouped, view);
     dataRows.forEach((row) => {
       const rawName = String(row[view.field] || "").trim();
       const name = view.transform ? view.transform(rawName) : rawName || "Unassigned";
       const divisiMarketing = String(row["Divisi Marketing"] || "Unassigned").trim() || "Unassigned";
       const groupBrand = String(row["Group Brand"] || "Unassigned").trim() || "Unassigned";
-      const groupKey = view.id === "prodesc" ? `${divisiMarketing}|||${groupBrand}|||${name}` : view.showMarketingColumn ? `${divisiMarketing}|||${name}` : name;
+      const groupKey = groupKeyFor(view, divisiMarketing, groupBrand, name);
       if (!name) return;
       if (!grouped.has(groupKey)) grouped.set(groupKey, { name, divisiMarketing, groupBrand, rows: [] });
       grouped.get(groupKey).rows.push(row);

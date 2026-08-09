@@ -214,8 +214,8 @@ select {
 .table-tools {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
+  justify-content: flex-start;
+  gap: 8px;
   padding: 10px;
   background: #fff;
 }
@@ -251,6 +251,7 @@ select {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+  margin-left: auto;
   color: var(--muted);
   font-size: 12px;
   white-space: nowrap;
