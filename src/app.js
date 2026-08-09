@@ -118,30 +118,33 @@
     return MONTH_NAMES.map(() => 0);
   }
 
+  function sumTargetRows(rows, predicate) {
+    return rows.filter(predicate).reduce(
+      (months, row) => months.map((sum, index) => sum + numeric(row[monthKey(2026, index + 1)])),
+      emptyMonths()
+    );
+  }
+
   function targetMonthsFor(view, group) {
     if (!TARGET_ROWS) return emptyMonths();
     if (view.id === "marketing") {
-      const row = (TARGET_ROWS.targetMarketingTim || []).find((item) => canonicalMarketing(item["BY MARKETING TIM"]) === canonicalMarketing(group.name));
-      return row ? rowMonths(row) : emptyMonths();
+      return sumTargetRows(TARGET_ROWS.targetMarketingTim || [], (item) => canonicalMarketing(item["BY MARKETING TIM"]) === canonicalMarketing(group.name));
     }
     if (view.id === "sales") {
-      const row = (TARGET_ROWS.targetDivisi || []).find((item) => String(item["BY TIM SALES"] || "").trim().toUpperCase() === group.name.toUpperCase());
-      return row ? rowMonths(row) : emptyMonths();
+      return sumTargetRows(TARGET_ROWS.targetDivisi || [], (item) => String(item["BY TIM SALES"] || "").trim().toUpperCase() === group.name.toUpperCase());
     }
     if (view.id === "brand") {
-      const row = (TARGET_ROWS.targetBrand || []).find(
+      return sumTargetRows(TARGET_ROWS.targetBrand || [],
         (item) => canonicalMarketing(item["Divisi Marketing"]) === canonicalMarketing(group.divisiMarketing) && String(item.Brand || "").trim().toUpperCase() === group.name.toUpperCase()
       );
-      return row ? rowMonths(row) : emptyMonths();
     }
     if (view.id === "prodesc") {
-      const row = (TARGET_ROWS.targetProdesc || []).find(
+      return sumTargetRows(TARGET_ROWS.targetProdesc || [],
         (item) =>
           canonicalMarketing(item["Divisi Marketing"]) === canonicalMarketing(group.divisiMarketing) &&
           String(item.Brand || "").trim().toUpperCase() === String(group.groupBrand || "").trim().toUpperCase() &&
           String(item.PRODESC || "").trim().toUpperCase() === group.name.toUpperCase()
       );
-      return row ? rowMonths(row) : emptyMonths();
     }
     return emptyMonths();
   }
