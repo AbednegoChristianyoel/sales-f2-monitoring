@@ -26,6 +26,7 @@
   const MONTH_NAMES = [
     "JAN", "FEB", "MAR", "APR", "MEI", "JUN", "JUL", "AGU", "SEP", "OKT", "NOV", "DES",
   ];
+  const PERIODS_2026 = MONTH_NAMES.map((_, index) => monthKey(2026, index + 1));
 
   const EMBEDDED_ROWS = Array.isArray(window.SALES_F2_DATA) ? window.SALES_F2_DATA : [];
   const STORAGE_KEY = "sales-f2-monitoring-v10";
@@ -86,6 +87,11 @@
       total += sourceRows.reduce((sum, row) => sum + numeric(row[key]), 0);
     }
     return total;
+  }
+
+  function sumMonth(sourceRows, year, month) {
+    const key = monthKey(year, month);
+    return sourceRows.reduce((sum, row) => sum + numeric(row[key]), 0);
   }
 
   function avgWindow(sourceRows, period, offsetStart, offsetEnd) {
@@ -166,6 +172,8 @@
       const avgB25 = avgWindow(sourceRows, period, 2, 5);
       const avgB02 = avgWindow(sourceRows, period, 0, 2);
       const avgB35 = avgWindow(sourceRows, period, 3, 5);
+      const history2025 = MONTH_NAMES.map((_, index) => sumMonth(sourceRows, year - 1, index + 1));
+      const actual2026 = MONTH_NAMES.map((_, index) => sumMonth(sourceRows, year, index + 1));
 
       return {
         name,
@@ -186,6 +194,8 @@
         growth33: pct(avgB02 - avgB35, avgB35),
         contLy: pct(ytdLy, totalLy),
         contTy: pct(ytdTy, totalTy),
+        history2025,
+        actual2026,
         targetKey,
       };
     });
@@ -216,26 +226,78 @@
       growth33: pct(avgWindow(includedRows, period, 0, 2) - avgWindow(includedRows, period, 3, 5), avgWindow(includedRows, period, 3, 5)),
       contLy: 1,
       contTy: 1,
+      history2025: MONTH_NAMES.map((_, index) => sumMonth(includedRows, year - 1, index + 1)),
+      actual2026: MONTH_NAMES.map((_, index) => sumMonth(includedRows, year, index + 1)),
       total: true,
     };
 
     return { rows, total };
   }
 
+  function getCellValue(row, key) {
+    if (key.startsWith("history2025.")) return row.history2025[Number(key.split(".")[1])];
+    if (key.startsWith("actual2026.")) return row.actual2026[Number(key.split(".")[1])];
+    if (key === "actualYtd") return row.ytdTy;
+    if (key === "ytdTyGrowth") return row.ytdTy;
+    return row[key];
+  }
+
+  function sortRows(rows, sort) {
+    if (!sort.key) return rows;
+    return [...rows].sort((a, b) => {
+      const aValue = getCellValue(a, sort.key);
+      const bValue = getCellValue(b, sort.key);
+      if (typeof aValue === "string" || typeof bValue === "string") {
+        return sort.direction === "asc"
+          ? String(aValue).localeCompare(String(bValue))
+          : String(bValue).localeCompare(String(aValue));
+      }
+      return sort.direction === "asc" ? numeric(aValue) - numeric(bValue) : numeric(bValue) - numeric(aValue);
+    });
+  }
+
+  function getTableColumns(period, showHistory) {
+    const month = Number(period.slice(4, 6));
+    const year = Number(period.slice(0, 4));
+    const columns = [
+      { key: "target", label: `Target YTD ${monthLabel(period)}`, type: "number", editable: true },
+      { key: "actualYtd", label: `Actual YTD ${monthLabel(period)}`, type: "number" },
+      { key: "ach", label: "ACH (%)", type: "percent" },
+      { key: "gapTarget", label: "Gap to Target", type: "number" },
+      { key: "ytdLy", label: `YTD ${MONTH_NAMES[month - 1]} '${String(year - 1).slice(2)} (LY)`, type: "number" },
+      { key: "ytdTyGrowth", label: `YTD ${MONTH_NAMES[month - 1]} '${String(year).slice(2)} (TY)`, type: "number" },
+      { key: "gapGrowthZero", label: "Gap to GRW 0%", type: "number" },
+      { key: "avgLy", label: `AVG YTD ${MONTH_NAMES[month - 1]} ${year - 1}`, type: "number" },
+      { key: "avgTy", label: `AVG YTD ${MONTH_NAMES[month - 1]} ${year}`, type: "number" },
+      { key: "avgB01", label: "AVG B0 - B1 (2)", type: "number" },
+      { key: "avgB25", label: "AVG B2 - B5 (4)", type: "number" },
+      { key: "avgB02", label: "AVG B0 - B2 (3)", type: "number" },
+      { key: "avgB35", label: "AVG B3 - B5 (3)", type: "number" },
+      { key: "growthYtd", label: "GRW YTD", type: "percent" },
+      { key: "growth24", label: "GRW 2-4", type: "percent" },
+      { key: "growth33", label: "GRW 3-3", type: "percent" },
+      { key: "contLy", label: `CONT ${year - 1}`, type: "percent" },
+      { key: "contTy", label: `CONT ${year}`, type: "percent" },
+    ];
+
+    if (showHistory) {
+      MONTH_NAMES.forEach((name, index) => columns.push({ key: `history2025.${index}`, label: `${name} 2025`, type: "number", history: true }));
+      MONTH_NAMES.forEach((name, index) => columns.push({ key: `actual2026.${index}`, label: `${name} 2026`, type: "number", history: true }));
+    }
+
+    return columns;
+  }
+
   function App() {
-    const [dataRows, setDataRows] = useState(() => safeLoad(STORAGE_KEY, EMBEDDED_ROWS));
+    const [dataRows] = useState(() => EMBEDDED_ROWS);
     const [targets, setTargets] = useState(() => safeLoad(TARGET_KEY, {}));
     const [activeViewId, setActiveViewId] = useState("marketing");
-    const [status, setStatus] = useState(`${EMBEDDED_ROWS.length.toLocaleString("id-ID")} rows loaded from Sales F2.xlsx.`);
-    const monthColumns = useMemo(() => findMonthColumns(dataRows), [dataRows]);
-    const [period, setPeriod] = useState("");
+    const [status] = useState(`${EMBEDDED_ROWS.length.toLocaleString("id-ID")} rows loaded from Sales F2.xlsx.`);
+    const [period, setPeriod] = useState("202606");
+    const [showHistory, setShowHistory] = useState(false);
+    const [sort, setSort] = useState({ key: null, direction: "desc" });
+    const [alertPeriod, setAlertPeriod] = useState(null);
 
-    useEffect(() => {
-      if (!period && monthColumns.length) setPeriod(monthColumns[monthColumns.length - 1]);
-      if (period && monthColumns.length && !monthColumns.includes(period)) setPeriod(monthColumns[monthColumns.length - 1]);
-    }, [monthColumns, period]);
-
-    useEffect(() => localStorage.setItem(STORAGE_KEY, JSON.stringify(dataRows)), [dataRows]);
     useEffect(() => localStorage.setItem(TARGET_KEY, JSON.stringify(targets)), [targets]);
 
     const activeView = VIEW_CONFIG.find((view) => view.id === activeViewId);
@@ -244,31 +306,31 @@
       return buildRows(dataRows, activeView, period, targets);
     }, [dataRows, activeView, period, targets]);
 
-    function onUpload(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (loadEvent) => {
-        try {
-          const workbook = XLSX.read(new Uint8Array(loadEvent.target.result), { type: "array" });
-          const sheet = workbook.Sheets[workbook.SheetNames[0]];
-          const parsed = XLSX.utils.sheet_to_json(sheet, { defval: "" }).map(normalizeRow);
-          setDataRows(parsed);
-          setStatus(`${file.name} imported: ${parsed.length.toLocaleString("id-ID")} rows from ${workbook.SheetNames[0]}.`);
-        } catch (error) {
-          setStatus(`Import failed: ${error.message}`);
-        }
-      };
-      reader.readAsArrayBuffer(file);
-    }
-
     function updateTarget(key, value) {
       setTargets((current) => ({ ...current, [key]: numeric(value) }));
     }
 
     const summary = total || {};
     const selectedLabel = period ? monthLabel(period) : "";
-    const displayRows = total ? [...rows, total] : rows;
+    const currentMonthActual = total ? total.actual2026[Number(period.slice(4, 6)) - 1] : 0;
+    const sortedRows = useMemo(() => sortRows(rows, sort), [rows, sort]);
+    const displayRows = total ? [...sortedRows, total] : sortedRows;
+    const tableColumns = getTableColumns(period, showHistory);
+
+    useEffect(() => {
+      if (total && numeric(currentMonthActual) === 0) setAlertPeriod(period);
+    }, [period, total, currentMonthActual]);
+
+    function onPeriodChange(value) {
+      setPeriod(value);
+    }
+
+    function onSort(key) {
+      setSort((current) => ({
+        key,
+        direction: current.key === key && current.direction === "desc" ? "asc" : "desc",
+      }));
+    }
 
     return React.createElement(
       "main",
@@ -281,16 +343,21 @@
           null,
           React.createElement("p", { className: "eyebrow" }, "Sales performance monitoring"),
           React.createElement("h1", null, "Sales F2 Dashboard"),
-          React.createElement("p", { className: "subtitle" }, "Upload Excel sales data, choose a period, and review target, achievement, growth, averages, and contribution by team or product view.")
+          React.createElement("p", { className: "subtitle" }, "Monitor target, actual, achievement, growth, moving averages, and contribution from the embedded Sales F2 Excel database.")
         ),
         React.createElement(
           "div",
           { className: "actions" },
-          React.createElement("label", { className: "upload-button" }, "Upload Excel", React.createElement("input", { type: "file", accept: ".xlsx,.xls", onChange: onUpload })),
           React.createElement(
             "select",
-            { value: period, onChange: (event) => setPeriod(event.target.value), "aria-label": "Select period" },
-            monthColumns.map((column) => React.createElement("option", { key: column, value: column }, monthLabel(column)))
+            { value: period, onChange: (event) => onPeriodChange(event.target.value), "aria-label": "Select period" },
+            PERIODS_2026.map((column) => React.createElement("option", { key: column, value: column }, monthLabel(column)))
+          ),
+          React.createElement(
+            "label",
+            { className: "toggle-control" },
+            React.createElement("input", { type: "checkbox", checked: showHistory, onChange: (event) => setShowHistory(event.target.checked) }),
+            React.createElement("span", null, "History Sales")
           )
         )
       ),
@@ -330,45 +397,40 @@
               React.createElement(
                 "tr",
                 null,
-                React.createElement("th", { rowSpan: 2, className: "sticky-col name-col" }, activeView.label),
+                React.createElement("th", { rowSpan: 2, className: "sticky-col name-col" }, React.createElement(SortButton, { column: { key: "name", label: activeView.label }, sort, onSort })),
                 React.createElement("th", { colSpan: 4, className: "group target-head" }, "To Target"),
                 React.createElement("th", { colSpan: 3, className: "group growth-head" }, "Growth Per YTD"),
                 React.createElement("th", { colSpan: 9, className: "group average-head" }, "Growth Per Average"),
-                React.createElement("th", { colSpan: 2, className: "group cont-head" }, "Contribution")
+                React.createElement("th", { colSpan: 2, className: "group cont-head" }, "Contribution"),
+                showHistory && React.createElement("th", { colSpan: 12, className: "group history-head" }, "History Sales 2025"),
+                showHistory && React.createElement("th", { colSpan: 12, className: "group actual-head" }, "Actual 2026")
               ),
               React.createElement(
                 "tr",
                 null,
-                [
-                  `Target YTD ${selectedLabel}`,
-                  `Actual YTD ${selectedLabel}`,
-                  "ACH (%)",
-                  "Gap to Target",
-                  `YTD ${MONTH_NAMES[Number(period.slice(4, 6)) - 1]} '${String(Number(period.slice(0, 4)) - 1).slice(2)} (LY)`,
-                  `YTD ${MONTH_NAMES[Number(period.slice(4, 6)) - 1]} '${period.slice(2, 4)} (TY)`,
-                  "Gap to GRW 0%",
-                  `AVG YTD ${MONTH_NAMES[Number(period.slice(4, 6)) - 1]} ${Number(period.slice(0, 4)) - 1}`,
-                  `AVG YTD ${MONTH_NAMES[Number(period.slice(4, 6)) - 1]} ${period.slice(0, 4)}`,
-                  "AVG B0 - B1 (2)",
-                  "AVG B2 - B5 (4)",
-                  "AVG B0 - B2 (3)",
-                  "AVG B3 - B5 (3)",
-                  "GRW YTD",
-                  "GRW 2-4",
-                  "GRW 3-3",
-                  `CONT ${Number(period.slice(0, 4)) - 1}`,
-                  `CONT ${period.slice(0, 4)}`,
-                ].map((label) => React.createElement("th", { key: label }, label))
+                tableColumns.map((column) => React.createElement("th", { key: column.key, className: column.history ? "history-col" : "" }, React.createElement(SortButton, { column, sort, onSort })))
               )
             ),
             React.createElement(
               "tbody",
               null,
-              displayRows.map((row) => React.createElement(DataRow, { key: row.total ? "total" : row.targetKey, row, updateTarget }))
+              displayRows.map((row) => React.createElement(DataRow, { key: row.total ? "total" : row.targetKey, row, columns: tableColumns, updateTarget }))
             )
           )
         )
-      )
+      ),
+      alertPeriod &&
+        React.createElement(
+          "div",
+          { className: "modal-backdrop", role: "dialog", "aria-modal": "true" },
+          React.createElement(
+            "div",
+            { className: "modal" },
+            React.createElement("h2", null, "Sales Belum Tersedia"),
+            React.createElement("p", null, `Sales bulan ${monthLabel(alertPeriod)} masih 0. Kemungkinan data belum ada atau belum closing.`),
+            React.createElement("button", { onClick: () => setAlertPeriod(null) }, "OK")
+          )
+        )
     );
   }
 
@@ -376,42 +438,34 @@
     return React.createElement("article", { className: `summary-card ${tone || ""}` }, React.createElement("span", null, label), React.createElement("strong", null, value));
   }
 
-  function DataRow({ row, updateTarget }) {
-    const numberCells = [
-      row.ytdTy,
-      row.ach,
-      row.gapTarget,
-      row.ytdLy,
-      row.ytdTy,
-      row.gapGrowthZero,
-      row.avgLy,
-      row.avgTy,
-      row.avgB01,
-      row.avgB25,
-      row.avgB02,
-      row.avgB35,
-      row.growthYtd,
-      row.growth24,
-      row.growth33,
-      row.contLy,
-      row.contTy,
-    ];
+  function SortButton({ column, sort, onSort }) {
+    const active = sort.key === column.key;
+    return React.createElement(
+      "button",
+      { className: `sort-button ${active ? "active" : ""}`, onClick: () => onSort(column.key), title: `Sort ${column.label}` },
+      React.createElement("span", null, column.label),
+      React.createElement("b", null, active ? (sort.direction === "asc" ? "ASC" : "DESC") : "SORT")
+    );
+  }
 
+  function DataRow({ row, columns, updateTarget }) {
     return React.createElement(
       "tr",
       { className: row.total ? "total-row" : "" },
       React.createElement("td", { className: "sticky-col name-cell", title: row.name }, row.name),
-      React.createElement(
-        "td",
-        { className: "editable-cell" },
-        row.total
-          ? formatNumber(row.target)
-          : React.createElement("input", { value: Math.round(row.target), onChange: (event) => updateTarget(row.targetKey, event.target.value), "aria-label": `Target for ${row.name}` })
-      ),
-      numberCells.map((value, index) => {
-        const percentIndexes = new Set([1, 12, 13, 14, 15, 16]);
-        const className = index === 1 ? classify((value || 0) - 1) : index >= 12 ? classify(value) : index === 2 || index === 5 ? classify(value) : "";
-        return React.createElement("td", { key: index, className }, percentIndexes.has(index) ? formatPct(value) : formatNumber(value));
+      columns.map((column) => {
+        const value = getCellValue(row, column.key);
+        const tone = column.key === "ach" ? classify((value || 0) - 1) : column.type === "percent" || column.key.includes("gap") ? classify(value) : "";
+        if (column.editable) {
+          return React.createElement(
+            "td",
+            { key: column.key, className: "editable-cell" },
+            row.total
+              ? formatNumber(row.target)
+              : React.createElement("input", { value: Math.round(row.target), onChange: (event) => updateTarget(row.targetKey, event.target.value), "aria-label": `Target for ${row.name}` })
+          );
+        }
+        return React.createElement("td", { key: column.key, className: `${tone} ${column.history ? "history-col" : ""}` }, column.type === "percent" ? formatPct(value) : formatNumber(value));
       })
     );
   }
