@@ -30,10 +30,12 @@ fs.writeFileSync(
   `import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const publicDir = path.resolve(__dirname, "..");
+const publicDir = [
+  path.resolve(process.cwd(), "dist"),
+  path.resolve(process.cwd()),
+  path.resolve(process.cwd(), "..")
+].find((candidate) => fs.existsSync(path.join(candidate, "index.html"))) || process.cwd();
 const mime = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
