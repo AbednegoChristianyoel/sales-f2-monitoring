@@ -27,10 +27,12 @@ copyDir(path.join(root, "src"), path.join(dist, "src"));
 fs.mkdirSync(path.join(dist, "server"), { recursive: true });
 fs.writeFileSync(
   path.join(dist, "server", "index.js"),
-  `const http = require("node:http");
-const fs = require("node:fs");
-const path = require("node:path");
+  `import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.resolve(__dirname, "..");
 const mime = {
   ".html": "text/html; charset=utf-8",
