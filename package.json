@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "build": "vite build",
+    "build": "node build.js",
     "dev": "vite --host 0.0.0.0"
   },
   "dependencies": {
