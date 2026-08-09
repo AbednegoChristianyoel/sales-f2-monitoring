@@ -30,6 +30,7 @@
 
   const EMBEDDED_ROWS = Array.isArray(window.SALES_F2_DATA) ? window.SALES_F2_DATA : [];
   const TARGET_ROWS = window.TARGET_F2_DATA || {};
+  const DEFAULT_PERIOD = getLatestSalesPeriod(EMBEDDED_ROWS);
   const STORAGE_KEY = "sales-f2-monitoring-v10";
   const TARGET_KEY = "sales-f2-targets-v1";
 
@@ -81,6 +82,16 @@
     const clean = String(value).replace(/[^\d.-]/g, "");
     const parsed = Number(clean);
     return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function getLatestSalesPeriod(rows) {
+    const availablePeriods = new Set();
+    rows.forEach((row) => {
+      Object.keys(row || {}).forEach((key) => {
+        if (PERIODS_2026.includes(key) && numeric(row[key]) !== 0) availablePeriods.add(key);
+      });
+    });
+    return Array.from(availablePeriods).sort().pop() || PERIODS_2026[0];
   }
 
   function findMonthColumns(rows) {
@@ -548,7 +559,7 @@
     const [targets, setTargets] = useState(() => safeLoad(TARGET_KEY, {}));
     const [activeViewId, setActiveViewId] = useState("marketing");
     const [status] = useState(`${EMBEDDED_ROWS.length.toLocaleString("id-ID")} rows loaded from Sales F2.xlsx.`);
-    const [period, setPeriod] = useState("202606");
+    const [period, setPeriod] = useState(DEFAULT_PERIOD);
     const [showHistory, setShowHistory] = useState(false);
     const [showTargetTrend, setShowTargetTrend] = useState(false);
     const [sort, setSort] = useState({ key: null, direction: "desc" });
